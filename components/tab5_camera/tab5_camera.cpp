@@ -760,10 +760,17 @@ bool Tab5Camera::init_sensor_() {
   }
   
   if (this->flip_mirror_) {
-    int enable = 0;
-    esp_cam_sensor_ioctl(this->sensor_device_, 0x04000010, &enable);
-    esp_cam_sensor_ioctl(this->sensor_device_, 0x04000011, &enable);
-    ESP_LOGI(TAG, "✓ Flip/Mirror configuré");
+    int enable_flip = 1;
+    int enable_mirror = 1;
+    
+    esp_err_t ret_flip = esp_cam_sensor_ioctl(this->sensor_device_, 0x04000010, &enable_flip);
+    esp_err_t ret_mirror = esp_cam_sensor_ioctl(this->sensor_device_, 0x04000011, &enable_mirror);
+    
+    if (ret_flip == ESP_OK && ret_mirror == ESP_OK) {
+      ESP_LOGI(TAG, "✓ Flip/Mirror activé");
+    } else {
+      ESP_LOGW(TAG, "⚠ Flip/Mirror partiellement activé (flip=%d, mirror=%d)", ret_flip, ret_mirror);
+    }
   }
   
   ESP_LOGI(TAG, "✓ SC202CS détecté (PID: 0x%04X)", this->sensor_device_->id.pid);
@@ -801,7 +808,7 @@ bool Tab5Camera::init_csi_() {
   csi_config.output_data_color_type = CAM_CTLR_COLOR_RGB565;
   csi_config.data_lane_num = 1;
   csi_config.byte_swap_en = false;
-  csi_config.queue_items = 2;
+  csi_config.queue_items = 1;  // Réduit à 1 pour éviter crash SDIO
   
   esp_err_t ret = esp_cam_new_csi_ctlr(&csi_config, &this->csi_handle_);
   if (ret != ESP_OK) {
@@ -826,7 +833,7 @@ bool Tab5Camera::init_csi_() {
     return false;
   }
   
-  ESP_LOGI(TAG, "✓ CSI configuré pour 1280x720");
+  ESP_LOGI(TAG, "✓ CSI configuré (queue_items=1 pour stabilité)");
   return true;
 }
 
@@ -896,24 +903,54 @@ void Tab5Camera::configure_isp_color_correction_() {
 }
 
 bool Tab5Camera::allocate_buffer_() {
+  // Calculer la taille du buffer (1280x720 RGB565 = 2 bytes par pixel)
   this->frame_buffer_size_ = 1280 * 720 * 2;
   
+  // Arrondir à un multiple de 64 pour l'alignement SDIO
+  size_t aligned_size = (this->frame_buffer_size_ + 63) & ~63;
+  
+  ESP_LOGI(TAG, "Allocation buffers: %u bytes (aligné: %u)", 
+           this->frame_buffer_size_, aligned_size);
+  
+  // Allouer le premier buffer avec alignement strict
   this->frame_buffers_[0] = (uint8_t*)heap_caps_aligned_alloc(
-    64, this->frame_buffer_size_, MALLOC_CAP_SPIRAM
+    64, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA
   );
   
-  this->frame_buffers_[1] = (uint8_t*)heap_caps_aligned_alloc(
-    64, this->frame_buffer_size_, MALLOC_CAP_SPIRAM
-  );
-  
-  if (!this->frame_buffers_[0] || !this->frame_buffers_[1]) {
-    ESP_LOGE(TAG, "Buffer alloc failed");
+  if (!this->frame_buffers_[0]) {
+    ESP_LOGE(TAG, "❌ Échec allocation buffer 0");
     return false;
   }
   
+  // Initialiser à zéro pour éviter les données corrompues
+  memset(this->frame_buffers_[0], 0, aligned_size);
+  
+  // Allouer le second buffer
+  this->frame_buffers_[1] = (uint8_t*)heap_caps_aligned_alloc(
+    64, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA
+  );
+  
+  if (!this->frame_buffers_[1]) {
+    ESP_LOGE(TAG, "❌ Échec allocation buffer 1");
+    heap_caps_free(this->frame_buffers_[0]);
+    this->frame_buffers_[0] = nullptr;
+    return false;
+  }
+  
+  // Initialiser à zéro
+  memset(this->frame_buffers_[1], 0, aligned_size);
+  
+  // Mettre à jour la taille avec la taille alignée
+  this->frame_buffer_size_ = aligned_size;
+  
+  // Définir le buffer actuel
   this->current_frame_buffer_ = this->frame_buffers_[0];
   
-  ESP_LOGI(TAG, "✓ Buffers: 2x%u bytes", this->frame_buffer_size_);
+  ESP_LOGI(TAG, "✓ Buffers alloués:");
+  ESP_LOGI(TAG, "  - Buffer 0: %p", this->frame_buffers_[0]);
+  ESP_LOGI(TAG, "  - Buffer 1: %p", this->frame_buffers_[1]);
+  ESP_LOGI(TAG, "  - Taille: 2x%u bytes (aligné 64)", aligned_size);
+  
   return true;
 }
 
@@ -924,7 +961,17 @@ bool IRAM_ATTR Tab5Camera::on_csi_new_frame_(
 ) {
   Tab5Camera *cam = (Tab5Camera*)user_data;
   
-  trans->buffer = cam->frame_buffers_[cam->buffer_index_];
+  if (!cam || !trans) {
+    return false;
+  }
+  
+  // Vérifier que le buffer est valide
+  uint8_t current_buf = cam->buffer_index_;
+  if (current_buf >= 2 || cam->frame_buffers_[current_buf] == nullptr) {
+    return false;
+  }
+  
+  trans->buffer = cam->frame_buffers_[current_buf];
   trans->buflen = cam->frame_buffer_size_;
   
   return false;
@@ -937,8 +984,18 @@ bool IRAM_ATTR Tab5Camera::on_csi_frame_done_(
 ) {
   Tab5Camera *cam = (Tab5Camera*)user_data;
   
-  if (trans->received_size > 0) {
+  if (!cam || !trans) {
+    return false;
+  }
+  
+  // Vérifier que la frame est valide et complète
+  if (trans->received_size > 0 && 
+      trans->received_size <= cam->frame_buffer_size_) {
+    
+    // Marquer la frame comme prête
     cam->frame_ready_ = true;
+    
+    // Passer au buffer suivant (double buffering)
     cam->buffer_index_ = (cam->buffer_index_ + 1) % 2;
   }
   
@@ -1038,37 +1095,62 @@ bool Tab5Camera::set_exposure(uint32_t exposure_val) {
 }
 
 bool Tab5Camera::start_streaming() {
-  if (!this->initialized_ || this->streaming_) {
+  if (!this->initialized_) {
+    ESP_LOGE(TAG, "Caméra non initialisée");
     return false;
   }
   
-  ESP_LOGI(TAG, "Démarrage streaming");
+  if (this->streaming_) {
+    ESP_LOGW(TAG, "Déjà en streaming");
+    return true;
+  }
   
+  ESP_LOGI(TAG, "Démarrage streaming...");
+  
+  // Réinitialiser les états
+  this->frame_ready_ = false;
+  this->buffer_index_ = 0;
+  
+  // Démarrer le capteur SC202CS
   if (this->sensor_device_) {
     int enable = 1;
     esp_err_t ret = esp_cam_sensor_ioctl(
       this->sensor_device_, 
-      0x04000004,
+      0x04000004,  // ESP_CAM_SENSOR_IOC_S_STREAM
       &enable
     );
+    
     if (ret != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to start sensor: %d", ret);
+      ESP_LOGE(TAG, "❌ Échec démarrage capteur: 0x%x", ret);
       return false;
     }
     
-    delay(100);
+    ESP_LOGI(TAG, "✓ Capteur démarré");
     
+    // Délai pour stabilisation du capteur
+    delay(150);
+    
+    // Appliquer les paramètres de gain et exposition
     this->apply_sensor_params_();
   }
   
+  // Démarrer le contrôleur CSI
   esp_err_t ret = esp_cam_ctlr_start(this->csi_handle_);
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Start CSI failed: %d", ret);
+    ESP_LOGE(TAG, "❌ Échec démarrage CSI: 0x%x", ret);
+    
+    // Arrêter le capteur en cas d'échec
+    if (this->sensor_device_) {
+      int enable = 0;
+      esp_cam_sensor_ioctl(this->sensor_device_, 0x04000004, &enable);
+    }
+    
     return false;
   }
   
   this->streaming_ = true;
-  ESP_LOGI(TAG, "✅ Streaming actif (1280x720)");
+  
+  ESP_LOGI(TAG, "✅ Streaming actif (1280x720 @ 30fps)");
   return true;
 }
 
@@ -1094,15 +1176,28 @@ bool Tab5Camera::capture_frame() {
     return false;
   }
   
+  // Vérification atomique du flag
   bool was_ready = this->frame_ready_;
-  if (was_ready) {
-    this->frame_ready_ = false;
-    
-    uint8_t last_complete_buffer = (this->buffer_index_ + 1) % 2;
-    this->current_frame_buffer_ = this->frame_buffers_[last_complete_buffer];
+  if (!was_ready) {
+    return false;
   }
   
-  return was_ready;
+  // Réinitialiser le flag AVANT de copier le buffer
+  this->frame_ready_ = false;
+  
+  // Utiliser le buffer qui vient d'être complété
+  // buffer_index_ pointe sur le buffer EN COURS de remplissage
+  // Donc le buffer complété est l'autre
+  uint8_t last_complete_buffer = (this->buffer_index_ + 1) % 2;
+  
+  // Vérifier que le buffer est valide
+  if (this->frame_buffers_[last_complete_buffer] != nullptr) {
+    this->current_frame_buffer_ = this->frame_buffers_[last_complete_buffer];
+    return true;
+  }
+  
+  ESP_LOGW(TAG, "Buffer invalide détecté");
+  return false;
 }
 
 uint16_t Tab5Camera::get_image_width() const {
