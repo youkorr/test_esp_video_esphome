@@ -39,7 +39,8 @@ async def to_code(config):
         component_dir / "deps" / "include" / "esp_cam_sensor.h",
         component_dir / "deps" / "include" / "esp_cam_sensor_xclk.h",
         component_dir / "deps" / "include" / "esp_sccb_i2c.h",
-        component_dir / "deps" / "include" / "esp_cam_sensor_types.h",  # NOUVEAU
+        component_dir / "deps" / "include" / "esp_cam_sensor_types.h",
+        component_dir / "deps" / "include" / "esp_cam_motor_types.h", # NOUVEAU
     ]
     
     for stub in critical_stubs:
