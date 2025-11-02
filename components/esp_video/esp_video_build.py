@@ -1,5 +1,5 @@
 """
-esp_video_build.py — build script ESPHome avec création automatique des stubs
+esp_video_build.py — Script FORCANT la création des stubs
 """
 import os
 import sys
@@ -9,25 +9,24 @@ Import("env")
 
 print("\n[ESP-Video] ⚙ Initialisation du build script")
 
-# Vérifier framework
 framework = env.get("PIOFRAMEWORK", [])
 if "espidf" not in framework:
     print("[ESP-Video] ❌ ESP-IDF requis")
     sys.exit(1)
 
-# Trouver esp_video
 def find_component_root():
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
+        return current_dir
     except NameError:
-        current_dir = os.getcwd()
+        pass
     
     for root, dirs, _ in os.walk("/data/external_components"):
         if "esp_video" in dirs:
             path = os.path.join(root, "esp_video")
             if os.path.exists(os.path.join(path, "include")):
                 return path
-    return current_dir
+    return os.getcwd()
 
 component_dir = find_component_root()
 print(f"[ESP-Video] 📂 Composant: {component_dir}")
@@ -44,16 +43,17 @@ add_include(os.path.join(component_dir, "include", "sys"))
 add_include(os.path.join(component_dir, "private_include"))
 
 # ===============================================================
-# CRÉER LES STUBS AUTOMATIQUEMENT
+# CRÉER LES STUBS - TOUJOURS
 # ===============================================================
 deps_dir = os.path.join(component_dir, "deps", "include")
-os.makedirs(deps_dir, exist_ok=True)
 
-print("[ESP-Video] 🔧 Création des stubs headers...")
+print(f"[ESP-Video] 🔧 Création forcée des stubs dans: {deps_dir}")
 
-# esp_cam_sensor.h
-stub1 = os.path.join(deps_dir, "esp_cam_sensor.h")
-if not os.path.exists(stub1):
+try:
+    os.makedirs(deps_dir, exist_ok=True)
+    
+    # esp_cam_sensor.h - TOUJOURS recréer
+    stub1 = os.path.join(deps_dir, "esp_cam_sensor.h")
     with open(stub1, 'w') as f:
         f.write('''#pragma once
 #include <stdint.h>
@@ -74,11 +74,10 @@ esp_err_t esp_cam_sensor_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, void 
 }
 #endif
 ''')
-    print("[ESP-Video]   ✓ esp_cam_sensor.h")
-
-# esp_cam_sensor_xclk.h
-stub2 = os.path.join(deps_dir, "esp_cam_sensor_xclk.h")
-if not os.path.exists(stub2):
+    print(f"[ESP-Video]   ✓ {stub1}")
+    
+    # esp_cam_sensor_xclk.h
+    stub2 = os.path.join(deps_dir, "esp_cam_sensor_xclk.h")
     with open(stub2, 'w') as f:
         f.write('''#pragma once
 #include <stdint.h>
@@ -94,11 +93,10 @@ esp_err_t esp_cam_sensor_xclk_deinit(void);
 }
 #endif
 ''')
-    print("[ESP-Video]   ✓ esp_cam_sensor_xclk.h")
-
-# esp_sccb_i2c.h
-stub3 = os.path.join(deps_dir, "esp_sccb_i2c.h")
-if not os.path.exists(stub3):
+    print(f"[ESP-Video]   ✓ {stub2}")
+    
+    # esp_sccb_i2c.h
+    stub3 = os.path.join(deps_dir, "esp_sccb_i2c.h")
     with open(stub3, 'w') as f:
         f.write('''#pragma once
 #include <stdint.h>
@@ -118,15 +116,22 @@ esp_err_t esp_sccb_del_i2c_io(esp_sccb_io_handle_t h);
 }
 #endif
 ''')
-    print("[ESP-Video]   ✓ esp_sccb_i2c.h")
+    print(f"[ESP-Video]   ✓ {stub3}")
+    
+    # Ajouter au CPPPATH
+    env.Append(CPPPATH=[deps_dir])
+    print(f"[ESP-Video] ➕ Include deps ajouté: {deps_dir}")
+    
+except Exception as e:
+    print(f"[ESP-Video] ⚠️ Erreur création stubs: {e}")
+    import traceback
+    traceback.print_exc()
 
-add_include(deps_dir)
-
-# Tab5 camera redirect
+# Tab5 camera
 project_dir = env.subst("$PROJECT_DIR")
 for path in [
     os.path.join(project_dir, "src/esphome/components/tab5_camera"),
-    os.path.join("/data/build/tab5/src/esphome/components/tab5_camera")
+    "/data/build/tab5/src/esphome/components/tab5_camera"
 ]:
     if os.path.exists(path):
         env.Append(CPPPATH=[path])
