@@ -8,10 +8,14 @@ import sys
 # TROUVER LE RÉPERTOIRE ESP-VIDEO AUTOMATIQUEMENT
 # ============================================================================
 
-# Le script est dans esp_video/esp_video_build.py
-# Donc ESP_VIDEO_DIR est le répertoire parent de ce script
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ESP_VIDEO_DIR = SCRIPT_DIR  # Le script EST dans le dossier esp_video
+# Essayer d'obtenir le chemin du script via __file__, sinon fallback sur PROJECT_DIR
+try:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    # __file__ n'est pas défini dans certains contextes ESPHome
+    SCRIPT_DIR = os.path.join(env.get("PROJECT_DIR", ""), "components", "esp_video")
+
+ESP_VIDEO_DIR = SCRIPT_DIR
 
 print("=" * 80)
 print("🎬 ESP-Video Build Script")
@@ -87,15 +91,11 @@ for src in device_sources:
 # ============================================================================
 
 if all_sources:
-    # Créer une library statique
     esp_video_lib = env.Library(
         target=os.path.join("$BUILD_DIR", "libesp_video"),
         source=all_sources
     )
-    
-    # Ajouter au link
     env.Append(LIBS=[esp_video_lib])
-    
     print(f"✅ Compiled {len(all_sources)} sources into libesp_video.a")
 else:
     print("❌ No sources found!")
@@ -121,3 +121,4 @@ print(f"✓ Added {len(build_flags)} build flags")
 print("=" * 80)
 print("✅ ESP-Video build configuration complete")
 print("=" * 80)
+
