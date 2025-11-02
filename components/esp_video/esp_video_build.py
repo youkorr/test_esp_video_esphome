@@ -1,5 +1,5 @@
 """
-esp_video_build.py — Script FORCANT la création des stubs
+esp_video_build.py — Script avec deps/include en PRIORITÉ
 """
 import os
 import sys
@@ -31,103 +31,56 @@ def find_component_root():
 component_dir = find_component_root()
 print(f"[ESP-Video] 📂 Composant: {component_dir}")
 
+# ===============================================================
+# CRÉER ET AJOUTER deps/include EN PREMIER (PRIORITÉ MAXIMALE)
+# ===============================================================
+deps_dir = os.path.join(component_dir, "deps", "include")
+
+print(f"[ESP-Video] 🔧 Vérification des stubs dans: {deps_dir}")
+
+# Créer le dossier si nécessaire
+os.makedirs(deps_dir, exist_ok=True)
+
+# Vérifier que les 3 fichiers existent
+required_stubs = [
+    "esp_cam_sensor.h",
+    "esp_cam_sensor_xclk.h", 
+    "esp_sccb_i2c.h"
+]
+
+all_present = True
+for stub in required_stubs:
+    stub_path = os.path.join(deps_dir, stub)
+    if os.path.exists(stub_path):
+        print(f"[ESP-Video]   ✓ {stub}")
+    else:
+        print(f"[ESP-Video]   ❌ {stub} MANQUANT!")
+        all_present = False
+
+if not all_present:
+    print("[ESP-Video] ⚠️ ERREUR: Stubs manquants! Vérifiez votre push GitHub.")
+    sys.exit(1)
+
+# AJOUTER deps/include EN PREMIER (avec Prepend au lieu de Append)
+env.Prepend(CPPPATH=[deps_dir])
+print(f"[ESP-Video] ➕ Include deps ajouté EN PRIORITÉ: {deps_dir}")
+
+# ===============================================================
+# Includes esp_video (après deps)
+# ===============================================================
 def add_include(path):
     if os.path.exists(path):
         env.Append(CPPPATH=[path])
         print(f"[ESP-Video] ➕ Include: {os.path.basename(path)}")
 
-# Includes de base
 add_include(os.path.join(component_dir, "include"))
 add_include(os.path.join(component_dir, "include", "linux"))
 add_include(os.path.join(component_dir, "include", "sys"))
 add_include(os.path.join(component_dir, "private_include"))
 
 # ===============================================================
-# CRÉER LES STUBS - TOUJOURS
-# ===============================================================
-deps_dir = os.path.join(component_dir, "deps", "include")
-
-print(f"[ESP-Video] 🔧 Création forcée des stubs dans: {deps_dir}")
-
-try:
-    os.makedirs(deps_dir, exist_ok=True)
-    
-    # esp_cam_sensor.h - TOUJOURS recréer
-    stub1 = os.path.join(deps_dir, "esp_cam_sensor.h")
-    with open(stub1, 'w') as f:
-        f.write('''#pragma once
-#include <stdint.h>
-#include <stdbool.h>
-#include "esp_err.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
-typedef enum { ESP_CAM_SENSOR_MIPI_CSI = 0, ESP_CAM_SENSOR_DVP = 1 } esp_cam_sensor_port_t;
-typedef struct { void *sccb_handle; int reset_pin; int pwdn_pin; int xclk_pin; uint32_t xclk_freq_hz; esp_cam_sensor_port_t sensor_port; } esp_cam_sensor_config_t;
-typedef struct { uint16_t pid; } esp_cam_sensor_id_t;
-typedef struct { uint16_t width; uint16_t height; uint32_t format; } esp_cam_sensor_format_t;
-typedef struct esp_cam_sensor_device_t esp_cam_sensor_device_t;
-typedef struct { esp_err_t (*query_para_desc)(esp_cam_sensor_device_t*, void*); esp_err_t (*get_para_value)(esp_cam_sensor_device_t*, uint32_t, void*, size_t); esp_err_t (*set_para_value)(esp_cam_sensor_device_t*, uint32_t, const void*, size_t); esp_err_t (*query_support_formats)(esp_cam_sensor_device_t*, void*); esp_err_t (*query_support_capability)(esp_cam_sensor_device_t*, void*); esp_err_t (*set_format)(esp_cam_sensor_device_t*, const void*); esp_err_t (*get_format)(esp_cam_sensor_device_t*, void*); esp_err_t (*priv_ioctl)(esp_cam_sensor_device_t*, uint32_t, void*); esp_err_t (*del)(esp_cam_sensor_device_t*); } esp_cam_sensor_ops_t;
-struct esp_cam_sensor_device_t { char *name; void *sccb_handle; int xclk_pin; int reset_pin; int pwdn_pin; esp_cam_sensor_port_t sensor_port; esp_cam_sensor_id_t id; const esp_cam_sensor_ops_t *ops; void *priv; bool stream_status; };
-esp_err_t esp_cam_sensor_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, void *arg);
-#ifdef __cplusplus
-}
-#endif
-''')
-    print(f"[ESP-Video]   ✓ {stub1}")
-    
-    # esp_cam_sensor_xclk.h
-    stub2 = os.path.join(deps_dir, "esp_cam_sensor_xclk.h")
-    with open(stub2, 'w') as f:
-        f.write('''#pragma once
-#include <stdint.h>
-#include "esp_err.h"
-#include "driver/gpio.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
-typedef struct { gpio_num_t xclk_pin; uint32_t xclk_freq_hz; } esp_cam_sensor_xclk_config_t;
-esp_err_t esp_cam_sensor_xclk_init(esp_cam_sensor_xclk_config_t *config);
-esp_err_t esp_cam_sensor_xclk_deinit(void);
-#ifdef __cplusplus
-}
-#endif
-''')
-    print(f"[ESP-Video]   ✓ {stub2}")
-    
-    # esp_sccb_i2c.h
-    stub3 = os.path.join(deps_dir, "esp_sccb_i2c.h")
-    with open(stub3, 'w') as f:
-        f.write('''#pragma once
-#include <stdint.h>
-#include "esp_err.h"
-#include "driver/i2c_master.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
-typedef struct esp_sccb_io_t *esp_sccb_io_handle_t;
-typedef enum { I2C_ADDR_BIT_LEN_7 = 0, I2C_ADDR_BIT_LEN_10 } i2c_addr_bit_len_t;
-typedef struct { uint8_t device_address; i2c_addr_bit_len_t dev_addr_length; uint32_t scl_speed_hz; uint8_t addr_bits_width; uint8_t val_bits_width; } sccb_i2c_config_t;
-esp_err_t sccb_new_i2c_io(i2c_master_bus_handle_t bus, const sccb_i2c_config_t *cfg, esp_sccb_io_handle_t *ret);
-esp_err_t esp_sccb_transmit_reg_a16v8(esp_sccb_io_handle_t h, uint16_t reg, uint8_t data);
-esp_err_t esp_sccb_transmit_receive_reg_a16v8(esp_sccb_io_handle_t h, uint16_t reg, uint8_t *data);
-esp_err_t esp_sccb_del_i2c_io(esp_sccb_io_handle_t h);
-#ifdef __cplusplus
-}
-#endif
-''')
-    print(f"[ESP-Video]   ✓ {stub3}")
-    
-    # Ajouter au CPPPATH
-    env.Append(CPPPATH=[deps_dir])
-    print(f"[ESP-Video] ➕ Include deps ajouté: {deps_dir}")
-    
-except Exception as e:
-    print(f"[ESP-Video] ⚠️ Erreur création stubs: {e}")
-    import traceback
-    traceback.print_exc()
-
 # Tab5 camera
+# ===============================================================
 project_dir = env.subst("$PROJECT_DIR")
 for path in [
     os.path.join(project_dir, "src/esphome/components/tab5_camera"),
@@ -138,7 +91,9 @@ for path in [
         print(f"[ESP-Video] 🎯 tab5_camera: {path}")
         break
 
-# Flags
+# ===============================================================
+# Flags de compilation
+# ===============================================================
 for flag in [
     "CONFIG_ESP_VIDEO_ENABLE_MIPI_CSI_VIDEO_DEVICE=1",
     "CONFIG_ESP_VIDEO_ENABLE_ISP=1",
@@ -148,7 +103,8 @@ for flag in [
 ]:
     env.Append(CPPDEFINES=[flag.replace("-D", "")])
 
-print("[ESP-Video] ✅ Configuration terminée\n")
+print("[ESP-Video] ✅ Configuration terminée")
+print(f"[ESP-Video] 📋 CPPPATH priorité: {env['CPPPATH'][:3]}\n")
 
 
 
