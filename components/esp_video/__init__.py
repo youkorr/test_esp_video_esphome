@@ -73,7 +73,8 @@ async def to_code(config):
     # LOG RUNTIME (VISIBLE DANS ESPHOME LOGS)
     # ========================================================================
     
-    # Ajoute un appel dans setup() au démarrage du composant
-    cg.add(var.add_setup_task(cg.RawExpression('ESP_LOGI("esp_video", "🎬 ESP-Video component initialized");')))
+    # Ce code sera injecté dans la fonction setup() du firmware final
+    cg.add(cg.RawExpression('ESP_LOGI("esp_video", "🎬 ESP-Video component initialized successfully");'))
+
 
 
