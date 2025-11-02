@@ -6,6 +6,53 @@
 
 #ifdef USE_ESP32_VARIANT_ESP32P4
 
+// ===================================================================================
+// 🔧 Fake headers for ESP-Video compatibility (stubs pour compilation ESPHome)
+// ===================================================================================
+#ifndef ESP_CAM_FAKE_HEADERS
+#define ESP_CAM_FAKE_HEADERS
+
+// --- esp_cam_sensor_xclk.h ---
+typedef struct esp_cam_sensor_xclk_t *esp_cam_sensor_xclk_handle_t;
+typedef enum {
+    ESP_CAM_SENSOR_XCLK_MODE_GPIO = 0,
+    ESP_CAM_SENSOR_XCLK_MODE_LED_PWM,
+    ESP_CAM_SENSOR_XCLK_MODE_CLOCK_OUT,
+} esp_cam_sensor_xclk_mode_t;
+
+typedef struct {
+    int gpio_num;
+    unsigned int freq_hz;
+    esp_cam_sensor_xclk_mode_t mode;
+} esp_cam_sensor_xclk_config_t;
+
+static inline int esp_cam_sensor_new_xclk(const esp_cam_sensor_xclk_config_t *, esp_cam_sensor_xclk_handle_t *) { return 0; }
+static inline int esp_cam_sensor_del_xclk(esp_cam_sensor_xclk_handle_t) { return 0; }
+static inline int esp_cam_sensor_start_xclk(esp_cam_sensor_xclk_handle_t) { return 0; }
+static inline int esp_cam_sensor_stop_xclk(esp_cam_sensor_xclk_handle_t) { return 0; }
+
+// --- esp_cam_sensor.h ---
+typedef struct esp_cam_sensor_t *esp_cam_sensor_handle_t;
+typedef struct {
+    int sccb_addr;
+} esp_cam_sensor_config_t;
+
+static inline int esp_cam_sensor_probe(const esp_cam_sensor_config_t *, esp_cam_sensor_handle_t *) { return 0; }
+
+// --- esp_sccb_i2c.h ---
+typedef struct esp_sccb_i2c_t *esp_sccb_i2c_handle_t;
+typedef struct {
+    int sda_pin;
+    int scl_pin;
+    int clk_speed_hz;
+} esp_sccb_i2c_config_t;
+
+static inline int esp_sccb_i2c_new(const esp_sccb_i2c_config_t *, esp_sccb_i2c_handle_t *) { return 0; }
+static inline int esp_sccb_i2c_del(esp_sccb_i2c_handle_t) { return 0; }
+
+#endif  // ESP_CAM_FAKE_HEADERS
+// ===================================================================================
+
 // Headers ESP-Video (disponibles grâce au composant esp_video)
 extern "C" {
   #include "esp_video_init.h"
@@ -20,7 +67,7 @@ extern "C" {
 #include <sys/mman.h>
 #include <unistd.h>
 
-#endif
+#endif  // USE_ESP32_VARIANT_ESP32P4
 
 namespace esphome {
 namespace tab5_camera {
@@ -35,7 +82,7 @@ enum PixelFormat {
 
 /**
  * @brief Tab5 Camera avec ESP-Video + Driver SC202CS complet
- * 
+ *
  * Architecture:
  *   SC202CS (I2C config) → RAW8 → MIPI-CSI → ESP-Video → ISP → RGB565 → V4L2
  */
@@ -75,41 +122,41 @@ class Tab5CameraV4L2 : public Component, public i2c::I2CDevice {
   uint8_t external_clock_pin_{36};
   uint32_t external_clock_frequency_{24000000};
   GPIOPin *reset_pin_{nullptr};
-  
+
   CameraResolution resolution_{RESOLUTION_720P};
   PixelFormat pixel_format_{PIXEL_FORMAT_RGB565};
   uint8_t framerate_{30};
   bool flip_mirror_{false};
-  
+
   bool auto_gain_{true};
   uint32_t manual_gain_{0};
   bool auto_exposure_{true};
   uint32_t manual_exposure_{0x300};
-  
+
   bool initialized_{false};
   bool streaming_{false};
   uint8_t *current_frame_buffer_{nullptr};
   size_t frame_buffer_size_{0};
   uint32_t total_frames_captured_{0};
   uint32_t last_fps_report_time_{0};
-  
+
 #ifdef USE_ESP32_VARIANT_ESP32P4
-  
+
   // V4L2
   int video_fd_{-1};
   struct v4l2_buffer *v4l2_buffers_{nullptr};
   uint32_t buffer_count_{0};
   uint32_t current_buffer_index_{0};
-  
+
   struct BufferMapping {
     void *start;
     size_t length;
   };
   BufferMapping *buffer_mappings_{nullptr};
-  
+
   // SC202CS
   esp_cam_sensor_device_t *sensor_device_{nullptr};
-  
+
   // Méthodes privées
   bool init_sensor_sc202cs_();
   bool configure_sensor_params_();
@@ -117,14 +164,15 @@ class Tab5CameraV4L2 : public Component, public i2c::I2CDevice {
   bool configure_format_v4l2_();
   bool setup_buffers_v4l2_();
   bool start_sensor_streaming_();
-  
+
   // Helpers I2C pour SC202CS (via I2CDevice ESPHome)
   bool sc202cs_write_reg_(uint16_t reg, uint8_t value);
   uint8_t sc202cs_read_reg_(uint16_t reg, bool *success = nullptr);
-  
+
 #endif
 };
 
 }  // namespace tab5_camera
 }  // namespace esphome
+
 
