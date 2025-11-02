@@ -28,15 +28,11 @@ async def to_code(config):
     # TROUVER LE CHEMIN DU COMPOSANT (même depuis GitHub)
     # ========================================================================
     
-    # Le composant est dans le cache ESPHome
-    # On doit trouver où __file__ est situé
     component_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Chemin relatif depuis le project_dir
     try:
         rel_path = os.path.relpath(component_dir, CORE.config_dir)
     except ValueError:
-        # Sur Windows, relpath peut échouer si sur des lecteurs différents
         rel_path = component_dir
     
     print(f"ESP-Video component directory: {component_dir}")
@@ -46,10 +42,10 @@ async def to_code(config):
     # INCLUDES
     # ========================================================================
     
-    cg.add_build_flag(f"-I{rel_path}/include")
-    cg.add_build_flag(f"-I{rel_path}/include/linux")
-    cg.add_build_flag(f"-I{rel_path}/include/sys")
-    cg.add_build_flag(f"-I{rel_path}/private_include")
+    cg.add_build_flag(f"-I{component_dir}/include")
+    cg.add_build_flag(f"-I{component_dir}/include/linux")
+    cg.add_build_flag(f"-I{component_dir}/include/sys")
+    cg.add_build_flag(f"-I{component_dir}/private_include")
     
     # ========================================================================
     # BUILD FLAGS
@@ -62,15 +58,15 @@ async def to_code(config):
     cg.add_build_flag("-DCONFIG_ESP_VIDEO_USE_HEAP_ALLOCATOR=1")
     
     # ========================================================================
-    # AJOUTER LE BUILD SCRIPT AUTOMATIQUEMENT
+    # AJOUTER LE BUILD SCRIPT AUTOMATIQUEMENT (CHEMIN ABSOLU)
     # ========================================================================
     
     build_script = os.path.join(component_dir, "esp_video_build.py")
     
     if os.path.exists(build_script):
-        # Ajouter le script via PlatformIO options
-        # ESPHome va automatiquement l'ajouter à extra_scripts
-        cg.add_platformio_option("extra_scripts", [f"post:{rel_path}/esp_video_build.py"])
-        print(f"✓ Added build script: {rel_path}/esp_video_build.py")
+        # Utiliser le chemin ABSOLU pour éviter les erreurs /data/data/...
+        cg.add_platformio_option("extra_scripts", [f"post:{build_script}"])
+        print(f"✓ Added build script: {build_script}")
     else:
         raise cv.Invalid(f"Build script not found: {build_script}")
+
