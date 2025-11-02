@@ -1,6 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import i2c
+from esphome.components import esp_video_wrapper
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
@@ -78,6 +79,14 @@ CONFIG_SCHEMA = cv.All(
 
 
 async def to_code(config):
+
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    
+    # Lier au wrapper esp-video
+    wrapper = await cg.get_variable(cv.use_id(esp_video_wrapper.ESPVideoWrapper))
+    cg.add(var.set_esp_video_wrapper(wrapper))
+    
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await i2c.register_i2c_device(var, config)
