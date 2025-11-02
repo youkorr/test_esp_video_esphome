@@ -162,78 +162,404 @@ typedef struct {
 
 
 
-// cleaned_0x18_FT_SC2356_24Minput_576Mbps_1lane_8bit_1280x720_30fps
 static const sc202cs_reginfo_t init_reglist_1280x720_30fps[] = {
-    {0x0103, 0x01},          {SC202CS_REG_SLEEP_MODE, 0x00},
-    {0x36e9, 0x80},          {0x36ea, 0x06},
-    {0x36eb, 0x0a},          {0x36ec, 0x01},
-    {0x36ed, 0x18},          {0x36e9, 0x24},
-    {0x301f, 0x18},          {0x3031, 0x08},
-    {0x3037, 0x00},          {0x3200, 0x00},
-    {0x3201, 0xa0},          {0x3202, 0x00},
-    {0x3203, 0xf0},          {0x3204, 0x05},
-    {0x3205, 0xa7},          {0x3206, 0x03},
-    {0x3207, 0xc7},          {0x3208, 0x05},
-    {0x3209, 0x00},          {0x320a, 0x02},
-    {0x320b, 0xd0},          {0x3210, 0x00},
-    {0x3211, 0x04},          {0x3212, 0x00},
-    {0x3213, 0x04},          {0x3301, 0xff},
-    {0x3304, 0x68},          {0x3306, 0x40},
-    {0x3308, 0x08},          {0x3309, 0xa8},
-    {0x330b, 0xd0},          {0x330c, 0x18},
-    {0x330d, 0xff},          {0x330e, 0x20},
-    {0x331e, 0x59},          {0x331f, 0x99},
-    {0x3333, 0x10},          {0x335e, 0x06},
-    {0x335f, 0x08},          {0x3364, 0x1f},
-    {0x337c, 0x02},          {0x337d, 0x0a},
-    {0x338f, 0xa0},          {0x3390, 0x01},
-    {0x3391, 0x03},          {0x3392, 0x1f},
-    {0x3393, 0xff},          {0x3394, 0xff},
-    {0x3395, 0xff},          {0x33a2, 0x04},
-    {0x33ad, 0x0c},          {0x33b1, 0x20},
-    {0x33b3, 0x38},          {0x33f9, 0x40},
-    {0x33fb, 0x48},          {0x33fc, 0x0f},
-    {0x33fd, 0x1f},          {0x349f, 0x03},
-    {0x34a6, 0x03},          {0x34a7, 0x1f},
-    {0x34a8, 0x38},          {0x34a9, 0x30},
-    {0x34ab, 0xd0},          {0x34ad, 0xd8},
-    {0x34f8, 0x1f},          {0x34f9, 0x20},
-    {0x3630, 0xa0},          {0x3631, 0x92},
-    {0x3632, 0x64},          {0x3633, 0x43},
-    {0x3637, 0x49},          {0x363a, 0x85},
-    {0x363c, 0x0f},          {0x3650, 0x31},
-    {0x3670, 0x0d},          {0x3674, 0xc0},
-    {0x3675, 0xa0},          {0x3676, 0xa0},
-    {0x3677, 0x92},          {0x3678, 0x96},
-    {0x3679, 0x9a},          {0x367c, 0x03},
-    {0x367d, 0x0f},          {0x367e, 0x01},
-    {0x367f, 0x0f},          {0x3698, 0x83},
-    {0x3699, 0x86},          {0x369a, 0x8c},
-    {0x369b, 0x94},          {0x36a2, 0x01},
-    {0x36a3, 0x03},          {0x36a4, 0x07},
-    {0x36ae, 0x0f},          {0x36af, 0x1f},
-    {0x36bd, 0x22},          {0x36be, 0x22},
-    {0x36bf, 0x22},          {0x36d0, 0x01},
-    {0x370f, 0x02},          {0x3721, 0x6c},
-    {0x3722, 0x8d},          {0x3725, 0xc5},
-    {0x3727, 0x14},          {0x3728, 0x04},
-    {0x37b7, 0x04},          {0x37b8, 0x04},
-    {0x37b9, 0x06},          {0x37bd, 0x07},
-    {0x37be, 0x0f},          {0x3901, 0x02},
-    {0x3903, 0x40},          {0x3905, 0x8d},
-    {0x3907, 0x00},          {0x3908, 0x41},
-    {0x391f, 0x41},          {0x3933, 0x80},
-    {0x3934, 0x02},          {0x3937, 0x6f},
-    {0x393a, 0x01},          {0x393d, 0x01},
-    {0x393e, 0xc0},          {0x39dd, 0x41},
-    {0x3e00, 0x00},          {0x3e01, 0x4d},
-    {0x3e02, 0x00},          {0x3e09, 0x03},
-    {0x4509, 0x28},          {0x450d, 0x61},
+    {0x0103, 0x01},
+    {SC202CS_REG_SLEEP_MODE, 0x00},
+    {0x36e9, 0x80},
+    {0x36ea, 0x06},
+    {0x36eb, 0x0a},
+    {0x36ec, 0x01},
+    {0x36ed, 0x18},
+    {0x36e9, 0x24},
+    {0x301f, 0x18},
+    {0x3031, 0x08},
+    {0x3037, 0x00},
+    {0x3200, 0x00},
+    {0x3201, 0xa0},
+    {0x3202, 0x00},
+    {0x3203, 0xf0},
+    {0x3204, 0x05},
+    {0x3205, 0xa7},
+    {0x3206, 0x03},
+    {0x3207, 0xc7},
+    {0x3208, 0x05},  // Output width H (1280 = 0x0500)
+    {0x3209, 0x00},  // Output width L
+    {0x320a, 0x02},  // Output height H (720 = 0x02D0)
+    {0x320b, 0xd0},  // Output height L
+    {0x3210, 0x00},
+    {0x3211, 0x04},
+    {0x3212, 0x00},
+    {0x3213, 0x04},
+    {0x3301, 0xff},
+    {0x3304, 0x68},
+    {0x3306, 0x40},
+    {0x3308, 0x08},
+    {0x3309, 0xa8},
+    {0x330b, 0xd0},
+    {0x330c, 0x18},
+    {0x330d, 0xff},
+    {0x330e, 0x20},
+    {0x331e, 0x59},
+    {0x331f, 0x99},
+    {0x3333, 0x10},
+    {0x335e, 0x06},
+    {0x335f, 0x08},
+    {0x3364, 0x1f},
+    {0x337c, 0x02},
+    {0x337d, 0x0a},
+    {0x338f, 0xa0},
+    {0x3390, 0x01},
+    {0x3391, 0x03},
+    {0x3392, 0x1f},
+    {0x3393, 0xff},
+    {0x3394, 0xff},
+    {0x3395, 0xff},
+    {0x33a2, 0x04},
+    {0x33ad, 0x0c},
+    {0x33b1, 0x20},
+    {0x33b3, 0x38},
+    {0x33f9, 0x40},
+    {0x33fb, 0x48},
+    {0x33fc, 0x0f},
+    {0x33fd, 0x1f},
+    {0x349f, 0x03},
+    {0x34a6, 0x03},
+    {0x34a7, 0x1f},
+    {0x34a8, 0x38},
+    {0x34a9, 0x30},
+    {0x34ab, 0xd0},
+    {0x34ad, 0xd8},
+    {0x34f8, 0x1f},
+    {0x34f9, 0x20},
+    {0x3630, 0xa0},
+    {0x3631, 0x92},
+    {0x3632, 0x64},
+    {0x3633, 0x43},
+    {0x3637, 0x49},
+    {0x363a, 0x85},
+    {0x363c, 0x0f},
+    {0x3650, 0x31},
+    {0x3670, 0x0d},
+    {0x3674, 0xc0},
+    {0x3675, 0xa0},
+    {0x3676, 0xa0},
+    {0x3677, 0x92},
+    {0x3678, 0x96},
+    {0x3679, 0x9a},
+    {0x367c, 0x03},
+    {0x367d, 0x0f},
+    {0x367e, 0x01},
+    {0x367f, 0x0f},
+    {0x3698, 0x83},
+    {0x3699, 0x86},
+    {0x369a, 0x8c},
+    {0x369b, 0x94},
+    {0x36a2, 0x01},
+    {0x36a3, 0x03},
+    {0x36a4, 0x07},
+    {0x36ae, 0x0f},
+    {0x36af, 0x1f},
+    {0x36bd, 0x22},
+    {0x36be, 0x22},
+    {0x36bf, 0x22},
+    {0x36d0, 0x01},
+    {0x370f, 0x02},
+    {0x3721, 0x6c},
+    {0x3722, 0x8d},
+    {0x3725, 0xc5},
+    {0x3727, 0x14},
+    {0x3728, 0x04},
+    {0x37b7, 0x04},
+    {0x37b8, 0x04},
+    {0x37b9, 0x06},
+    {0x37bd, 0x07},
+    {0x37be, 0x0f},
+    {0x3901, 0x02},
+    {0x3903, 0x40},
+    {0x3905, 0x8d},
+    {0x3907, 0x00},
+    {0x3908, 0x41},
+    {0x391f, 0x41},
+    {0x3933, 0x80},
+    {0x3934, 0x02},
+    {0x3937, 0x6f},
+    {0x393a, 0x01},
+    {0x393d, 0x01},
+    {0x393e, 0xc0},
+    {0x39dd, 0x41},
+    {0x3e00, 0x00},  // Exposure H
+    {0x3e01, 0x4d},  // Exposure M (0x4dc = 1244)
+    {0x3e02, 0xc0},  // Exposure L
+    {0x3e06, 0x00},  // Digital coarse gain
+    {0x3e07, 0x80},  // Digital fine gain (0x80 = 1.0x)
+    {0x3e09, 0x00},  // Analog gain (0x00 = 1.0x)
+    {0x4509, 0x28},
+    {0x450d, 0x61},
     {SC202CS_REG_END, 0x00},
 };
 
 
 
+typedef struct {
+    uint8_t dgain_fine;    // digital gain fine
+    uint8_t dgain_coarse;  // digital gain coarse
+    uint8_t analog_gain;
+} sc202cs_gain_t;
+
+typedef struct {
+    uint32_t exposure_val;
+    uint32_t gain_index;
+    uint32_t vflip_en : 1;
+    uint32_t hmirror_en : 1;
+} sc202cs_para_t;
+
+struct sc202cs_cam {
+    sc202cs_para_t sc202cs_para;
+};
+
+// ============================================================================
+// 🟢 AJOUTER : MACROS POUR L'EXPOSITION
+// ============================================================================
+
+#define SC202CS_FETCH_EXP_H(val) (((val) >> 12) & 0xF)
+#define SC202CS_FETCH_EXP_M(val) (((val) >> 4) & 0xFF)
+#define SC202CS_FETCH_EXP_L(val) (((val)&0xF) << 4)
+
+// ============================================================================
+// 🟢 AJOUTER : TABLES DE GAIN COMPLÈTES (192 entrées)
+// ============================================================================
+
+// Total gain = analog_gain x digital_gain x 1000
+static const uint32_t sc202cs_abs_gain_val_map[] = {
+    // 1X (indices 0-31) - Digital fine gain only
+    1000,  1031,  1063,  1094,  1125,  1156,  1188,  1219,
+    1250,  1281,  1313,  1344,  1375,  1406,  1438,  1469,
+    1500,  1531,  1563,  1594,  1625,  1656,  1688,  1719,
+    1750,  1781,  1813,  1844,  1875,  1906,  1938,  1969,
+    // 2X (indices 32-63) - Analog gain = 1 (2X)
+    2000,  2062,  2126,  2188,  2250,  2312,  2376,  2438,
+    2500,  2562,  2626,  2688,  2750,  2812,  2876,  2938,
+    3000,  3062,  3126,  3188,  3250,  3312,  3376,  3438,
+    3500,  3562,  3626,  3688,  3750,  3812,  3876,  3938,
+    // 4X (indices 64-95) - Analog gain = 3 (4X)
+    4000,  4124,  4252,  4376,  4500,  4624,  4752,  4876,
+    5000,  5124,  5252,  5376,  5500,  5624,  5752,  5876,
+    6000,  6124,  6252,  6376,  6500,  6624,  6752,  6876,
+    7000,  7124,  7252,  7376,  7500,  7624,  7752,  7876,
+    // 8X (indices 96-127) - Analog gain = 7 (8X)
+    8000,  8248,  8504,  8752,  9000,  9248,  9504,  9752,
+    10000, 10248, 10504, 10752, 11000, 11248, 11504, 11752,
+    12000, 12248, 12504, 12752, 13000, 13248, 13504, 13752,
+    14000, 14248, 14504, 14752, 15000, 15248, 15504, 15752,
+    // 16X (indices 128-159) - Analog gain = 15 (16X)
+    16000, 16496, 17008, 17504, 18000, 18496, 19008, 19504,
+    20000, 20496, 21008, 21504, 22000, 22496, 23008, 23504,
+    24000, 24496, 25008, 25504, 26000, 26496, 27008, 27504,
+    28000, 28496, 29008, 29504, 30000, 30496, 31008, 31504,
+    // 32X (indices 160-191) - Analog 16X + Digital coarse 2X
+    32000, 33008, 34000, 35008, 36000, 37008, 38000, 39008,
+    40000, 41008, 42000, 43008, 44000, 45008, 46000, 47008,
+    48000, 49008, 50000, 51008, 52000, 53008, 54000, 55008,
+    56000, 57008, 58000, 59008, 60000, 61008, 62000, 63008,
+};
+
+// SC202CS Gain map: [DIG_FINE, DIG_COARSE, ANALOG]
+static const sc202cs_gain_t sc202cs_gain_map[] = {
+    // 1X (0-31): Digital fine only, analog = 0
+    {0x80, 0x00, 0x00}, {0x84, 0x00, 0x00}, {0x88, 0x00, 0x00}, {0x8c, 0x00, 0x00},
+    {0x90, 0x00, 0x00}, {0x94, 0x00, 0x00}, {0x98, 0x00, 0x00}, {0x9c, 0x00, 0x00},
+    {0xa0, 0x00, 0x00}, {0xa4, 0x00, 0x00}, {0xa8, 0x00, 0x00}, {0xac, 0x00, 0x00},
+    {0xb0, 0x00, 0x00}, {0xb4, 0x00, 0x00}, {0xb8, 0x00, 0x00}, {0xbc, 0x00, 0x00},
+    {0xc0, 0x00, 0x00}, {0xc4, 0x00, 0x00}, {0xc8, 0x00, 0x00}, {0xcc, 0x00, 0x00},
+    {0xd0, 0x00, 0x00}, {0xd4, 0x00, 0x00}, {0xd8, 0x00, 0x00}, {0xdc, 0x00, 0x00},
+    {0xe0, 0x00, 0x00}, {0xe4, 0x00, 0x00}, {0xe8, 0x00, 0x00}, {0xec, 0x00, 0x00},
+    {0xf0, 0x00, 0x00}, {0xf4, 0x00, 0x00}, {0xf8, 0x00, 0x00}, {0xfc, 0x00, 0x00},
+    // 2X (32-63): Analog = 1
+    {0x80, 0x00, 0x01}, {0x84, 0x00, 0x01}, {0x88, 0x00, 0x01}, {0x8c, 0x00, 0x01},
+    {0x90, 0x00, 0x01}, {0x94, 0x00, 0x01}, {0x98, 0x00, 0x01}, {0x9c, 0x00, 0x01},
+    {0xa0, 0x00, 0x01}, {0xa4, 0x00, 0x01}, {0xa8, 0x00, 0x01}, {0xac, 0x00, 0x01},
+    {0xb0, 0x00, 0x01}, {0xb4, 0x00, 0x01}, {0xb8, 0x00, 0x01}, {0xbc, 0x00, 0x01},
+    {0xc0, 0x00, 0x01}, {0xc4, 0x00, 0x01}, {0xc8, 0x00, 0x01}, {0xcc, 0x00, 0x01},
+    {0xd0, 0x00, 0x01}, {0xd4, 0x00, 0x01}, {0xd8, 0x00, 0x01}, {0xdc, 0x00, 0x01},
+    {0xe0, 0x00, 0x01}, {0xe4, 0x00, 0x01}, {0xe8, 0x00, 0x01}, {0xec, 0x00, 0x01},
+    {0xf0, 0x00, 0x01}, {0xf4, 0x00, 0x01}, {0xf8, 0x00, 0x01}, {0xfc, 0x00, 0x01},
+    // 4X (64-95): Analog = 3
+    {0x80, 0x00, 0x03}, {0x84, 0x00, 0x03}, {0x88, 0x00, 0x03}, {0x8c, 0x00, 0x03},
+    {0x90, 0x00, 0x03}, {0x94, 0x00, 0x03}, {0x98, 0x00, 0x03}, {0x9c, 0x00, 0x03},
+    {0xa0, 0x00, 0x03}, {0xa4, 0x00, 0x03}, {0xa8, 0x00, 0x03}, {0xac, 0x00, 0x03},
+    {0xb0, 0x00, 0x03}, {0xb4, 0x00, 0x03}, {0xb8, 0x00, 0x03}, {0xbc, 0x00, 0x03},
+    {0xc0, 0x00, 0x03}, {0xc4, 0x00, 0x03}, {0xc8, 0x00, 0x03}, {0xcc, 0x00, 0x03},
+    {0xd0, 0x00, 0x03}, {0xd4, 0x00, 0x03}, {0xd8, 0x00, 0x03}, {0xdc, 0x00, 0x03},
+    {0xe0, 0x00, 0x03}, {0xe4, 0x00, 0x03}, {0xe8, 0x00, 0x03}, {0xec, 0x00, 0x03},
+    {0xf0, 0x00, 0x03}, {0xf4, 0x00, 0x03}, {0xf8, 0x00, 0x03}, {0xfc, 0x00, 0x03},
+    // 8X (96-127): Analog = 7
+    {0x80, 0x00, 0x07}, {0x84, 0x00, 0x07}, {0x88, 0x00, 0x07}, {0x8c, 0x00, 0x07},
+    {0x90, 0x00, 0x07}, {0x94, 0x00, 0x07}, {0x98, 0x00, 0x07}, {0x9c, 0x00, 0x07},
+    {0xa0, 0x00, 0x07}, {0xa4, 0x00, 0x07}, {0xa8, 0x00, 0x07}, {0xac, 0x00, 0x07},
+    {0xb0, 0x00, 0x07}, {0xb4, 0x00, 0x07}, {0xb8, 0x00, 0x07}, {0xbc, 0x00, 0x07},
+    {0xc0, 0x00, 0x07}, {0xc4, 0x00, 0x07}, {0xc8, 0x00, 0x07}, {0xcc, 0x00, 0x07},
+    {0xd0, 0x00, 0x07}, {0xd4, 0x00, 0x07}, {0xd8, 0x00, 0x07}, {0xdc, 0x00, 0x07},
+    {0xe0, 0x00, 0x07}, {0xe4, 0x00, 0x07}, {0xe8, 0x00, 0x07}, {0xec, 0x00, 0x07},
+    {0xf0, 0x00, 0x07}, {0xf4, 0x00, 0x07}, {0xf8, 0x00, 0x07}, {0xfc, 0x00, 0x07},
+    // 16X (128-159): Analog = 15
+    {0x80, 0x00, 0x0f}, {0x84, 0x00, 0x0f}, {0x88, 0x00, 0x0f}, {0x8c, 0x00, 0x0f},
+    {0x90, 0x00, 0x0f}, {0x94, 0x00, 0x0f}, {0x98, 0x00, 0x0f}, {0x9c, 0x00, 0x0f},
+    {0xa0, 0x00, 0x0f}, {0xa4, 0x00, 0x0f}, {0xa8, 0x00, 0x0f}, {0xac, 0x00, 0x0f},
+    {0xb0, 0x00, 0x0f}, {0xb4, 0x00, 0x0f}, {0xb8, 0x00, 0x0f}, {0xbc, 0x00, 0x0f},
+    {0xc0, 0x00, 0x0f}, {0xc4, 0x00, 0x0f}, {0xc8, 0x00, 0x0f}, {0xcc, 0x00, 0x0f},
+    {0xd0, 0x00, 0x0f}, {0xd4, 0x00, 0x0f}, {0xd8, 0x00, 0x0f}, {0xdc, 0x00, 0x0f},
+    {0xe0, 0x00, 0x0f}, {0xe4, 0x00, 0x0f}, {0xe8, 0x00, 0x0f}, {0xec, 0x00, 0x0f},
+    {0xf0, 0x00, 0x0f}, {0xf4, 0x00, 0x0f}, {0xf8, 0x00, 0x0f}, {0xfc, 0x00, 0x0f},
+    // 32X (160-191): Analog 16X + Digital coarse 2X
+    {0x80, 0x01, 0x0f}, {0x84, 0x01, 0x0f}, {0x88, 0x01, 0x0f}, {0x8c, 0x01, 0x0f},
+    {0x90, 0x01, 0x0f}, {0x94, 0x01, 0x0f}, {0x98, 0x01, 0x0f}, {0x9c, 0x01, 0x0f},
+    {0xa0, 0x01, 0x0f}, {0xa4, 0x01, 0x0f}, {0xa8, 0x01, 0x0f}, {0xac, 0x01, 0x0f},
+    {0xb0, 0x01, 0x0f}, {0xb4, 0x01, 0x0f}, {0xb8, 0x01, 0x0f}, {0xbc, 0x01, 0x0f},
+    {0xc0, 0x01, 0x0f}, {0xc4, 0x01, 0x0f}, {0xc8, 0x01, 0x0f}, {0xcc, 0x01, 0x0f},
+    {0xd0, 0x01, 0x0f}, {0xd4, 0x01, 0x0f}, {0xd8, 0x01, 0x0f}, {0xdc, 0x01, 0x0f},
+    {0xe0, 0x01, 0x0f}, {0xe4, 0x01, 0x0f}, {0xe8, 0x01, 0x0f}, {0xec, 0x01, 0x0f},
+    {0xf0, 0x01, 0x0f}, {0xf4, 0x01, 0x0f}, {0xf8, 0x01, 0x0f}, {0xfc, 0x01, 0x0f},
+};
+
+// Limite du gain absolu (CONFIG_CAMERA_SC202CS_ABSOLUTE_GAIN_LIMIT = 63008)
+static const uint32_t s_limited_abs_gain = 63008;
+static size_t s_limited_abs_gain_index = sizeof(sc202cs_abs_gain_val_map) / sizeof(sc202cs_abs_gain_val_map[0]);
+
+// ============================================================================
+// 🟢 AJOUTER : ISP INFO POUR 1280x720
+// ============================================================================
+
+typedef struct {
+    uint8_t version;
+    uint32_t pclk;
+    uint16_t vts;
+    uint16_t hts;
+    uint32_t gain_def;
+    uint32_t exp_def;
+    uint8_t bayer_type;
+} esp_cam_sensor_isp_v1_info_t;
+
+typedef union {
+    esp_cam_sensor_isp_v1_info_t isp_v1_info;
+} esp_cam_sensor_isp_info_t;
+
+#define SENSOR_ISP_INFO_VERSION_DEFAULT 0
+#define ESP_CAM_SENSOR_BAYER_BGGR 3
+
+static const esp_cam_sensor_isp_info_t sc202cs_isp_info_720p = {
+    .isp_v1_info = {
+        .version = SENSOR_ISP_INFO_VERSION_DEFAULT,
+        .pclk = 72000000,    // 72 MHz
+        .vts = 1250,         // Vertical Total Size
+        .hts = 1920,         // Horizontal Total Size
+        .gain_def = 0,       // Gain index par défaut (1.0x)
+        .exp_def = 0x4dc,    // Exposition par défaut (1244)
+        .bayer_type = ESP_CAM_SENSOR_BAYER_BGGR,
+    }
+};
+
+// ============================================================================
+// 🟢 AJOUTER : CONSTANTES POUR LES PARAMÈTRES
+// ============================================================================
+
+#define ESP_CAM_SENSOR_EXPOSURE_VAL 0x04020001
+#define ESP_CAM_SENSOR_GAIN 0x04020002
+#define ESP_CAM_SENSOR_VFLIP 0x04000010
+#define ESP_CAM_SENSOR_HMIRROR 0x04000011
+
+// ============================================================================
+// 🟢 AJOUTER : FONCTIONS DE GESTION DES PARAMÈTRES
+// ============================================================================
+
+static esp_err_t sc202cs_set_para_value(esp_cam_sensor_device_t *dev, uint32_t id, const void *arg, size_t size) {
+    esp_err_t ret = ESP_OK;
+    uint32_t u32_val = *(uint32_t *)arg;
+    struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
+    
+    if (!cam_sc202cs) return ESP_ERR_INVALID_ARG;
+    
+    switch (id) {
+        case ESP_CAM_SENSOR_EXPOSURE_VAL: {
+            // Limiter l'exposition : max = VTS - 6
+            uint32_t max_exp = sc202cs_isp_info_720p.isp_v1_info.vts - 6;
+            if (u32_val > max_exp) u32_val = max_exp;
+            if (u32_val < 0xff) u32_val = 0xff;
+            
+            ESP_LOGD(SC202CS_TAG, "Set exposure: 0x%X (max=0x%X)", u32_val, max_exp);
+            
+            ret = sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_H, SC202CS_FETCH_EXP_H(u32_val));
+            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_M, SC202CS_FETCH_EXP_M(u32_val));
+            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_L, SC202CS_FETCH_EXP_L(u32_val));
+            
+            if (ret == ESP_OK) {
+                cam_sc202cs->sc202cs_para.exposure_val = u32_val;
+            }
+            break;
+        }
+        
+        case ESP_CAM_SENSOR_GAIN: {
+            // Limiter le gain à l'index maximum
+            if (u32_val >= s_limited_abs_gain_index) {
+                u32_val = s_limited_abs_gain_index - 1;
+            }
+            
+            ESP_LOGD(SC202CS_TAG, "Set gain[%u]: abs_gain=%u, DFine=0x%02X, DCoarse=0x%02X, Analog=0x%02X",
+                     u32_val,
+                     sc202cs_abs_gain_val_map[u32_val],
+                     sc202cs_gain_map[u32_val].dgain_fine,
+                     sc202cs_gain_map[u32_val].dgain_coarse,
+                     sc202cs_gain_map[u32_val].analog_gain);
+            
+            ret = sc202cs_write(dev->sccb_handle, SC202CS_REG_DIG_FINE_GAIN, 
+                               sc202cs_gain_map[u32_val].dgain_fine);
+            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_DIG_COARSE_GAIN, 
+                                sc202cs_gain_map[u32_val].dgain_coarse);
+            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_ANG_GAIN, 
+                                sc202cs_gain_map[u32_val].analog_gain);
+            
+            if (ret == ESP_OK) {
+                cam_sc202cs->sc202cs_para.gain_index = u32_val;
+            }
+            break;
+        }
+        
+        case ESP_CAM_SENSOR_VFLIP: {
+            int *value = (int *)arg;
+            ret = sc202cs_set_vflip(dev, *value);
+            break;
+        }
+        
+        case ESP_CAM_SENSOR_HMIRROR: {
+            int *value = (int *)arg;
+            ret = sc202cs_set_mirror(dev, *value);
+            break;
+        }
+        
+        default:
+            ESP_LOGE(SC202CS_TAG, "Paramètre non supporté: 0x%08X", id);
+            ret = ESP_ERR_INVALID_ARG;
+            break;
+    }
+    
+    return ret;
+}
+
+static esp_err_t sc202cs_get_para_value(esp_cam_sensor_device_t *dev, uint32_t id, void *arg, size_t size) {
+    struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
+    if (!cam_sc202cs) return ESP_ERR_INVALID_ARG;
+    
+    switch (id) {
+        case ESP_CAM_SENSOR_EXPOSURE_VAL:
+            *(uint32_t *)arg = cam_sc202cs->sc202cs_para.exposure_val;
+            break;
+        case ESP_CAM_SENSOR_GAIN:
+            *(uint32_t *)arg = cam_sc202cs->sc202cs_para.gain_index;
+            break;
+        default:
+            return ESP_ERR_NOT_SUPPORTED;
+    }
+    return ESP_OK;
+}
 
 
 
@@ -438,39 +764,9 @@ static esp_err_t sc202cs_set_stream(esp_cam_sensor_device_t *dev, int enable) {
 }
 
 static esp_err_t sc202cs_set_format(esp_cam_sensor_device_t *dev, const void *format) {
-    // Si format est NULL, utiliser la config par défaut depuis dev->priv
-    const sc202cs_reginfo_t *reg_list = NULL;
+    const sc202cs_reginfo_t *reg_list = init_reglist_1280x720_30fps;
     
-    if (format != NULL) {
-        // Format spécifié explicitement
-        const esp_cam_sensor_format_t *fmt = (const esp_cam_sensor_format_t *)format;
-        reg_list = (const sc202cs_reginfo_t *)fmt->regs;
-    } else if (dev->priv != NULL) {
-        // Utiliser la résolution stockée dans priv
-        uint32_t resolution_index = *(uint32_t*)dev->priv;
-        
-        switch (resolution_index) {
-            case 0: 
-                reg_list = init_reglist_1280x720_30fps;
-                ESP_LOGI(SC202CS_TAG, "Config: 720P 1280x720_30fps");
-                break;
-            case 1: // 720P 1280x720
-
-            case 2: 
-
-            case 3: // QVGA (si disponible)
-            
-            default:
-                // Par défaut, utiliser 720P
-                reg_list = init_reglist_1280x720_30fps;
-                ESP_LOGE(SC202CS_TAG, "Résolution non supportée, utilisation 720P");
-                break;
-        }
-    } else {
-        // Fallback absolu
-        reg_list = init_reglist_1280x720_30fps;
-        ESP_LOGW(SC202CS_TAG, "Format par défaut: 720P");
-    }
+    ESP_LOGI(SC202CS_TAG, "Configuration: 1280x720 @ 30fps (RAW8 -> RGB565)");
     
     if (reg_list == NULL) {
         ESP_LOGE(SC202CS_TAG, "Liste de registres invalide");
@@ -484,11 +780,20 @@ static esp_err_t sc202cs_set_format(esp_cam_sensor_device_t *dev, const void *fo
         return ret;
     }
     
-    ESP_LOGI(SC202CS_TAG, "✓ Format configuré");
+    // Initialiser les paramètres par défaut si dev->priv est alloué
+    if (dev->priv) {
+        struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
+        cam_sc202cs->sc202cs_para.exposure_val = sc202cs_isp_info_720p.isp_v1_info.exp_def;
+        cam_sc202cs->sc202cs_para.gain_index = sc202cs_isp_info_720p.isp_v1_info.gain_def;
+        ESP_LOGI(SC202CS_TAG, "Paramètres par défaut: exp=0x%X, gain_idx=%u", 
+                 cam_sc202cs->sc202cs_para.exposure_val,
+                 cam_sc202cs->sc202cs_para.gain_index);
+    }
+    
+    ESP_LOGI(SC202CS_TAG, "✓ Format 1280x720 configuré avec succès");
     return ESP_OK;
 }
 
-// CORRECTION: Support flip/mirror via IOCTL
 static esp_err_t sc202cs_priv_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, void *arg) {
     esp_err_t ret = ESP_OK;
     
@@ -497,18 +802,23 @@ static esp_err_t sc202cs_priv_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, 
             ret = sc202cs_set_stream(dev, *(int*)arg);
             break;
             
-        case 0x04000010: // ESP_CAM_SENSOR_IOC_S_VFLIP
+        case ESP_CAM_SENSOR_VFLIP:
             ret = sc202cs_set_vflip(dev, *(int*)arg);
             ESP_LOGI(SC202CS_TAG, "VFlip: %d", *(int*)arg);
             break;
             
-        case 0x04000011: // ESP_CAM_SENSOR_IOC_S_HMIRROR
+        case ESP_CAM_SENSOR_HMIRROR:
             ret = sc202cs_set_mirror(dev, *(int*)arg);
             ESP_LOGI(SC202CS_TAG, "HMirror: %d", *(int*)arg);
             break;
             
+        case ESP_CAM_SENSOR_EXPOSURE_VAL:
+        case ESP_CAM_SENSOR_GAIN:
+            ret = sc202cs_set_para_value(dev, cmd, arg, sizeof(uint32_t));
+            break;
+            
         default:
-            ESP_LOGW(SC202CS_TAG, "IOCTL non supporté: 0x%08X", cmd);
+            ESP_LOGD(SC202CS_TAG, "IOCTL non géré: 0x%08X", cmd);
             ret = ESP_ERR_NOT_SUPPORTED;
             break;
     }
@@ -518,7 +828,10 @@ static esp_err_t sc202cs_priv_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, 
 
 static esp_err_t sc202cs_delete(esp_cam_sensor_device_t *dev) {
     if (dev) {
-        if (dev->priv) free(dev->priv);
+        if (dev->priv) {
+            free(dev->priv);
+            dev->priv = NULL;
+        }
         free(dev);
     }
     return ESP_OK;
@@ -533,9 +846,28 @@ static const esp_cam_sensor_ops_t sc202cs_ops = {
 esp_cam_sensor_device_t *sc202cs_detect(esp_cam_sensor_config_t *config) {
     if (!config) return NULL;
     
+    // Calculer l'index de gain limité
+    for (size_t i = 0; i < sizeof(sc202cs_abs_gain_val_map) / sizeof(sc202cs_abs_gain_val_map[0]); i++) {
+        if (sc202cs_abs_gain_val_map[i] > s_limited_abs_gain) {
+            s_limited_abs_gain_index = i - 1;
+            break;
+        }
+    }
+    
+    ESP_LOGI(SC202CS_TAG, "Gain limité à: %u (index: %u)", s_limited_abs_gain, s_limited_abs_gain_index);
+    
+    // Allouer le device
     esp_cam_sensor_device_t *dev = (esp_cam_sensor_device_t*)calloc(1, sizeof(esp_cam_sensor_device_t));
     if (!dev) {
-        ESP_LOGE(SC202CS_TAG, "No memory");
+        ESP_LOGE(SC202CS_TAG, "Pas de mémoire pour le device");
+        return NULL;
+    }
+    
+    // Allouer la structure privée pour les paramètres
+    struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam*)calloc(1, sizeof(struct sc202cs_cam));
+    if (!cam_sc202cs) {
+        ESP_LOGE(SC202CS_TAG, "Pas de mémoire pour priv");
+        free(dev);
         return NULL;
     }
     
@@ -546,21 +878,30 @@ esp_cam_sensor_device_t *sc202cs_detect(esp_cam_sensor_config_t *config) {
     dev->pwdn_pin = config->pwdn_pin;
     dev->sensor_port = config->sensor_port;
     dev->ops = &sc202cs_ops;
+    dev->priv = cam_sc202cs;
     
     // Vérifier l'ID du capteur
     if (sc202cs_get_sensor_id(dev, &dev->id) != ESP_OK) {
-        ESP_LOGE(SC202CS_TAG, "Get sensor ID failed");
+        ESP_LOGE(SC202CS_TAG, "Échec lecture ID capteur");
+        free(cam_sc202cs);
         free(dev);
         return NULL;
     }
     
     if (dev->id.pid != SC202CS_PID) {
-        ESP_LOGE(SC202CS_TAG, "Wrong PID: 0x%x", dev->id.pid);
+        ESP_LOGE(SC202CS_TAG, "PID incorrect: 0x%04x (attendu: 0x%04x)", dev->id.pid, SC202CS_PID);
+        free(cam_sc202cs);
         free(dev);
         return NULL;
     }
     
-    ESP_LOGI(SC202CS_TAG, "SC202CS detected, PID=0x%x", dev->id.pid);
+    ESP_LOGI(SC202CS_TAG, "✓ SC202CS détecté");
+    ESP_LOGI(SC202CS_TAG, "  - PID: 0x%04X", dev->id.pid);
+    ESP_LOGI(SC202CS_TAG, "  - Niveaux de gain: %u (1.0x à %.1fx)", 
+             s_limited_abs_gain_index, 
+             sc202cs_abs_gain_val_map[s_limited_abs_gain_index - 1] / 1000.0f);
+    ESP_LOGI(SC202CS_TAG, "  - Exposition: 0x%03X à 0x%03X", 
+             0xff, sc202cs_isp_info_720p.isp_v1_info.vts - 6);
     
     return dev;
 }
