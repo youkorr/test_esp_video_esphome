@@ -5,12 +5,15 @@
 #include "esphome/components/i2c/i2c.h"
 
 #ifdef USE_ESP32_VARIANT_ESP32P4
-// ✅ Utiliser le VRAI ESP-Video framework d'Espressif
+// Forward declarations pour le driver SC202CS
+struct esp_cam_sensor_device_t;
+struct sc202cs_cam;
+
 extern "C" {
-  #include "esp_video_init.h"
-  #include "esp_video_device.h"
-  #include "esp_video_ioctl.h"
-  #include "linux/videodev2.h"
+  #include "esp_cam_ctlr.h"
+  #include "esp_cam_ctlr_csi.h"
+  #include "driver/isp.h"
+  #include "esp_ldo_regulator.h"
 }
 #endif
 
@@ -28,6 +31,11 @@ enum PixelFormat {
   PIXEL_FORMAT_YUV422 = 1,
   PIXEL_FORMAT_RAW8 = 2,
   PIXEL_FORMAT_JPEG = 3,
+};
+
+struct CameraResolutionInfo {
+  uint16_t width;
+  uint16_t height;
 };
 
 class Tab5Camera : public Component, public i2c::I2CDevice {
@@ -50,7 +58,7 @@ class Tab5Camera : public Component, public i2c::I2CDevice {
   void set_framerate(uint8_t fps) { this->framerate_ = fps; }
   void set_flip_mirror(bool enable) { this->flip_mirror_ = enable; }
 
-  // Contrôle avancé des paramètres
+  // 🟢 Contrôle avancé des paramètres
   void set_auto_gain(bool enable) { this->auto_gain_ = enable; }
   void set_manual_gain(uint32_t gain_index) { this->manual_gain_index_ = gain_index; }
   void set_auto_exposure(bool enable) { this->auto_exposure_ = enable; }
@@ -68,7 +76,7 @@ class Tab5Camera : public Component, public i2c::I2CDevice {
   uint16_t get_image_width() const;
   uint16_t get_image_height() const;
 
-  // Contrôle des paramètres en temps réel
+  // 🟢 Contrôle des paramètres en temps réel
   bool set_gain(uint32_t gain_index);
   bool set_exposure(uint32_t exposure_val);
   uint32_t get_current_gain() const { return this->current_gain_index_; }
@@ -90,36 +98,67 @@ class Tab5Camera : public Component, public i2c::I2CDevice {
   uint8_t framerate_{30};
   bool flip_mirror_{false};
 
-  // Contrôle avancé
+  // 🟢 Contrôle avancé
   bool auto_gain_{true};
   uint32_t manual_gain_index_{0};
   bool auto_exposure_{true};
-  uint32_t manual_exposure_val_{0x4dc};
+  uint32_t manual_exposure_val_{0x300};  // ✅ EXPOSITION RÉDUITE par défaut
   
   // État actuel des paramètres
   uint32_t current_gain_index_{0};
-  uint32_t current_exposure_val_{0x4dc};
+  uint32_t current_exposure_val_{0x300};  // ✅ EXPOSITION RÉDUITE
   
   // État de la caméra
   bool initialized_{false};
   bool streaming_{false};
+  bool frame_ready_{false};
+  
+  // ✅ AJOUT: Compteur atomique pour les frames disponibles
+  volatile uint32_t frames_available_{0};
+  
+  // ✅ AJOUT: Statistiques FPS
+  uint32_t total_frames_captured_{0};
+  uint32_t last_fps_report_time_{0};
   
   // Buffers d'image
+  uint8_t *frame_buffers_[2]{nullptr, nullptr};
   uint8_t *current_frame_buffer_{nullptr};
   size_t frame_buffer_size_{0};
+  uint8_t buffer_index_{0};
   
 #ifdef USE_ESP32_VARIANT_ESP32P4
-  // ✅ Handles ESP-Video (V4L2-like)
-  int video_fd_{-1};                    // File descriptor du device /dev/video0
-  struct v4l2_buffer *v4l2_buffers_{nullptr};  // Buffers V4L2
-  uint32_t buffer_count_{0};            // Nombre de buffers
-  uint32_t current_buffer_index_{0};    // Index du buffer courant
+  // Handles ESP-IDF
+  esp_cam_sensor_device_t *sensor_device_{nullptr};
+  esp_cam_ctlr_handle_t csi_handle_{nullptr};
+  isp_proc_handle_t isp_handle_{nullptr};
+  esp_ldo_channel_handle_t ldo_handle_{nullptr};
   
-  // Fonctions d'initialisation ESP-Video
-  bool init_esp_video_();
-  bool configure_format_();
-  bool setup_buffers_();
-  bool apply_controls_();
+  // Fonctions d'initialisation
+  bool init_sensor_();
+  bool init_ldo_();
+  bool init_csi_();
+  bool init_isp_();
+  bool allocate_buffer_();
+  void configure_isp_color_correction_();
+  
+  // 🟢 Gestion des paramètres
+  bool apply_sensor_params_();
+  
+  // Utilitaires
+  CameraResolutionInfo get_resolution_info_() const;
+  
+  // Callbacks CSI (doivent être statiques pour les callbacks C)
+  static bool IRAM_ATTR on_csi_new_frame_(
+    esp_cam_ctlr_handle_t handle,
+    esp_cam_ctlr_trans_t *trans,
+    void *user_data
+  );
+  
+  static bool IRAM_ATTR on_csi_frame_done_(
+    esp_cam_ctlr_handle_t handle,
+    esp_cam_ctlr_trans_t *trans,
+    void *user_data
+  );
 #endif
 };
 
