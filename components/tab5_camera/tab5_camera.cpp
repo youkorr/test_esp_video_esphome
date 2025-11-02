@@ -1,201 +1,21 @@
 #include "tab5_camera.h"
 #include "esphome/core/log.h"
-#include "esphome/core/application.h"
 
 #ifdef USE_ESP32_VARIANT_ESP32P4
 
 // ============================================================================
-// HEADERS ESP-IDF NÉCESSAIRES
-// ============================================================================
-
-extern "C" {
-#include "driver/i2c_master.h"
-}
-
-// ============================================================================
-// DÉFINITIONS COMPLÈTES DES STRUCTURES CAMERA SENSOR
-// ============================================================================
-
-extern "C" {
-
-// Type pour SCCB handle
-typedef struct esp_sccb_io_t* esp_sccb_io_handle_t;
-
-// Structure SCCB IO config
-typedef struct {
-    i2c_addr_bit_len_t dev_addr_length;
-    uint16_t device_address;
-    uint32_t scl_speed_hz;
-    uint32_t addr_bits_width;
-    uint32_t val_bits_width;
-} sccb_i2c_config_t;
-
-// Structure pour l'ID du capteur
-typedef struct {
-    uint8_t midh;
-    uint8_t midl;
-    uint16_t pid;
-    uint8_t ver;
-} esp_cam_sensor_id_t;
-
-// Type de port du capteur
-typedef enum {
-    ESP_CAM_SENSOR_DVP,
-    ESP_CAM_SENSOR_MIPI_CSI,
-} esp_cam_sensor_port_t;
-
-// Forward declaration pour les opérations
-struct esp_cam_sensor_device_t;
-typedef struct esp_cam_sensor_ops_t {
-    int (*set_format)(struct esp_cam_sensor_device_t *dev, const void *format);
-    int (*get_format)(struct esp_cam_sensor_device_t *dev, void *format);
-    int (*priv_ioctl)(struct esp_cam_sensor_device_t *dev, uint32_t cmd, void *arg);
-    int (*del)(struct esp_cam_sensor_device_t *dev);
-} esp_cam_sensor_ops_t;
-
-// Structure principale du device
-typedef struct esp_cam_sensor_device_t {
-    char *name;
-    esp_sccb_io_handle_t sccb_handle;
-    int8_t xclk_pin;
-    int8_t reset_pin;
-    int8_t pwdn_pin;
-    esp_cam_sensor_port_t sensor_port;
-    const void *cur_format;
-    esp_cam_sensor_id_t id;
-    uint8_t stream_status;
-    const esp_cam_sensor_ops_t *ops;
-    void *priv;
-} esp_cam_sensor_device_t;
-
-// Configuration du capteur
-typedef struct {
-    esp_sccb_io_handle_t sccb_handle;
-    int8_t reset_pin;
-    int8_t pwdn_pin;
-    int8_t xclk_pin;
-    int32_t xclk_freq_hz;
-    esp_cam_sensor_port_t sensor_port;
-} esp_cam_sensor_config_t;
-
-} // extern "C"
-
-// ============================================================================
-// IMPLÉMENTATIONS SCCB ET SENSOR
-// ============================================================================
-
-// Structure SCCB IO interne (utilise ESPHome I2C au lieu d'ESP-IDF)
-struct esp_sccb_io_t {
-    esphome::i2c::I2CDevice *i2c_device;
-    uint32_t addr_bits_width;
-    uint32_t val_bits_width;
-};
-
-// Forward declarations
-esp_err_t sccb_new_i2c_io_esphome(esphome::i2c::I2CDevice *i2c_device,
-                                   const sccb_i2c_config_t *config,
-                                   esp_sccb_io_handle_t *io_handle);
-
-esp_err_t esp_sccb_transmit_reg_a16v8(esp_sccb_io_handle_t handle, 
-                                       uint16_t reg_addr, 
-                                       uint8_t reg_val);
-
-esp_err_t esp_sccb_transmit_receive_reg_a16v8(esp_sccb_io_handle_t handle, 
-                                              uint16_t reg_addr, 
-                                              uint8_t *reg_val);
-
-// Implémentation de sccb_new_i2c_io pour ESPHome
-esp_err_t sccb_new_i2c_io_esphome(esphome::i2c::I2CDevice *i2c_device,
-                                   const sccb_i2c_config_t *config,
-                                   esp_sccb_io_handle_t *io_handle) {
-    if (!i2c_device || !config || !io_handle) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    esp_sccb_io_t *sccb = (esp_sccb_io_t*)malloc(sizeof(esp_sccb_io_t));
-    if (!sccb) {
-        return ESP_ERR_NO_MEM;
-    }
-    
-    sccb->i2c_device = i2c_device;
-    sccb->addr_bits_width = config->addr_bits_width ? config->addr_bits_width : 8;
-    sccb->val_bits_width = config->val_bits_width ? config->val_bits_width : 8;
-    
-    *io_handle = sccb;
-    return ESP_OK;
-}
-
-// Implémentations des fonctions SCCB pour communication I2C
-esp_err_t esp_sccb_transmit_reg_a16v8(esp_sccb_io_handle_t handle, 
-                                       uint16_t reg_addr, 
-                                       uint8_t reg_val) {
-    if (!handle || !handle->i2c_device) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    uint8_t data[3] = {
-        (uint8_t)((reg_addr >> 8) & 0xFF),
-        (uint8_t)(reg_addr & 0xFF),
-        reg_val
-    };
-    
-    esphome::i2c::ErrorCode err = handle->i2c_device->write(data, 3);
-    return (err == esphome::i2c::ERROR_OK) ? ESP_OK : ESP_FAIL;
-}
-
-esp_err_t esp_sccb_transmit_receive_reg_a16v8(esp_sccb_io_handle_t handle, 
-                                              uint16_t reg_addr, 
-                                              uint8_t *reg_val) {
-    if (!handle || !handle->i2c_device || !reg_val) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    uint8_t addr_buf[2] = {
-        (uint8_t)((reg_addr >> 8) & 0xFF),
-        (uint8_t)(reg_addr & 0xFF)
-    };
-    
-    esphome::i2c::ErrorCode err = handle->i2c_device->write(addr_buf, 2, false);
-    if (err != esphome::i2c::ERROR_OK) {
-        return ESP_FAIL;
-    }
-    
-    err = handle->i2c_device->read(reg_val, 1);
-    return (err == esphome::i2c::ERROR_OK) ? ESP_OK : ESP_FAIL;
-}
-
-// Implémentation de esp_cam_sensor_ioctl
-esp_err_t esp_cam_sensor_ioctl(esp_cam_sensor_device_t *dev, 
-                               uint32_t cmd, 
-                               void *arg) {
-    if (!dev || !dev->ops) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (!dev->ops->priv_ioctl) {
-        return ESP_ERR_NOT_SUPPORTED;
-    }
-    return dev->ops->priv_ioctl(dev, cmd, arg);
-}
-
-// Symboles faibles pour éviter les erreurs de linking
-__attribute__((weak)) void *__esp_cam_sensor_detect_fn_array_start = nullptr;
-__attribute__((weak)) void *__esp_cam_sensor_detect_fn_array_end = nullptr;
-
-// ============================================================================
-// CODE COMPLET DU DRIVER SC202CS
+// VOTRE DRIVER SC202CS COMPLET (réutilisé tel quel)
 // ============================================================================
 
 extern "C" {
 
 static const char *SC202CS_TAG = "sc202cs";
 
-// Types SC202CS
 typedef struct {
     uint16_t reg;
     uint8_t val;
 } sc202cs_reginfo_t;
 
-// Registres SC202CS
 #define SC202CS_REG_END   0xffff
 #define SC202CS_REG_DELAY 0xfffe
 #define SC202CS_REG_SENSOR_ID_H 0x3107
@@ -216,7 +36,7 @@ typedef struct {
 #endif
 #define delay_ms(ms) vTaskDelay((ms > portTICK_PERIOD_MS ? ms / portTICK_PERIOD_MS : 1))
 
-// Liste de registres pour 1280x720 @ 30fps RAW8
+// ✅ LISTE COMPLÈTE DES REGISTRES 720P@30FPS
 static const sc202cs_reginfo_t init_reglist_1280x720_30fps[] = {
     {0x0103, 0x01},
     {SC202CS_REG_SLEEP_MODE, 0x00},
@@ -256,30 +76,13 @@ static const sc202cs_reginfo_t init_reglist_1280x720_30fps[] = {
     {SC202CS_REG_END, 0x00},
 };
 
-// Structures et types pour la gestion des paramètres
+// ✅ TABLES DE GAIN COMPLÈTES (192 entrées)
 typedef struct {
     uint8_t dgain_fine;
     uint8_t dgain_coarse;
     uint8_t analog_gain;
 } sc202cs_gain_t;
 
-typedef struct {
-    uint32_t exposure_val;
-    uint32_t gain_index;
-    uint32_t vflip_en : 1;
-    uint32_t hmirror_en : 1;
-} sc202cs_para_t;
-
-struct sc202cs_cam {
-    sc202cs_para_t sc202cs_para;
-};
-
-// Macros pour l'exposition
-#define SC202CS_FETCH_EXP_H(val) (((val) >> 12) & 0xF)
-#define SC202CS_FETCH_EXP_M(val) (((val) >> 4) & 0xFF)
-#define SC202CS_FETCH_EXP_L(val) (((val)&0xF) << 4)
-
-// Tables de gain complètes (192 entrées)
 static const uint32_t sc202cs_abs_gain_val_map[] = {
     1000,  1031,  1063,  1094,  1125,  1156,  1188,  1219,
     1250,  1281,  1313,  1344,  1375,  1406,  1438,  1469,
@@ -358,301 +161,19 @@ static const sc202cs_gain_t sc202cs_gain_map[] = {
     {0xf0, 0x01, 0x0f}, {0xf4, 0x01, 0x0f}, {0xf8, 0x01, 0x0f}, {0xfc, 0x01, 0x0f},
 };
 
-static const uint32_t s_limited_abs_gain = 63008;
-static size_t s_limited_abs_gain_index = sizeof(sc202cs_abs_gain_val_map) / sizeof(sc202cs_abs_gain_val_map[0]);
+// Macros exposition
+#define SC202CS_FETCH_EXP_H(val) (((val) >> 12) & 0xF)
+#define SC202CS_FETCH_EXP_M(val) (((val) >> 4) & 0xFF)
+#define SC202CS_FETCH_EXP_L(val) (((val)&0xF) << 4)
 
-// ISP Info pour 720p
-#define SENSOR_ISP_INFO_VERSION_DEFAULT 0
-#define ESP_CAM_SENSOR_BAYER_BGGR 3
-#define ESP_CAM_SENSOR_EXPOSURE_VAL 0x04020001
-#define ESP_CAM_SENSOR_GAIN 0x04020002
-#define ESP_CAM_SENSOR_VFLIP 0x04000010
-#define ESP_CAM_SENSOR_HMIRROR 0x04000011
-
-// Fonctions SCCB de base
-static esp_err_t sc202cs_write(esp_sccb_io_handle_t handle, uint16_t reg, uint8_t data) {
-    return esp_sccb_transmit_reg_a16v8(handle, reg, data);
-}
-
-static esp_err_t sc202cs_read(esp_sccb_io_handle_t handle, uint16_t reg, uint8_t *data) {
-    return esp_sccb_transmit_receive_reg_a16v8(handle, reg, data);
-}
-
-static esp_err_t sc202cs_write_array(esp_sccb_io_handle_t handle, sc202cs_reginfo_t *regarray) {
-    int i = 0;
-    esp_err_t ret = ESP_OK;
-    while ((ret == ESP_OK) && regarray[i].reg != SC202CS_REG_END) {
-        if (regarray[i].reg != SC202CS_REG_DELAY) {
-            ret = sc202cs_write(handle, regarray[i].reg, regarray[i].val);
-        } else {
-            delay_ms(regarray[i].val);
-        }
-        i++;
-    }
-    return ret;
-}
-
-static esp_err_t sc202cs_set_reg_bits(esp_sccb_io_handle_t handle, 
-                                       uint16_t reg, 
-                                       uint8_t offset, 
-                                       uint8_t length,
-                                       uint8_t value) {
-    esp_err_t ret = ESP_OK;
-    uint8_t reg_data = 0;
-
-    ret = sc202cs_read(handle, reg, &reg_data);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-    
-    uint8_t mask = ((1 << length) - 1) << offset;
-    value = (reg_data & ~mask) | ((value << offset) & mask);
-    ret = sc202cs_write(handle, reg, value);
-    return ret;
-}
-
-static esp_err_t sc202cs_set_mirror(esp_cam_sensor_device_t *dev, int enable) {
-    return sc202cs_set_reg_bits(dev->sccb_handle, 0x3221, 1, 2, enable ? 0x03 : 0x00);
-}
-
-static esp_err_t sc202cs_set_vflip(esp_cam_sensor_device_t *dev, int enable) {
-    return sc202cs_set_reg_bits(dev->sccb_handle, 0x3221, 5, 2, enable ? 0x03 : 0x00);
-}
-
-static esp_err_t sc202cs_get_sensor_id(esp_cam_sensor_device_t *dev, esp_cam_sensor_id_t *id) {
-    uint8_t pid_h, pid_l;
-    esp_err_t ret = sc202cs_read(dev->sccb_handle, SC202CS_REG_SENSOR_ID_H, &pid_h);
-    if (ret != ESP_OK) return ret;
-    
-    ret = sc202cs_read(dev->sccb_handle, SC202CS_REG_SENSOR_ID_L, &pid_l);
-    if (ret != ESP_OK) return ret;
-    
-    id->pid = (pid_h << 8) | pid_l;
-    return ESP_OK;
-}
-
-static esp_err_t sc202cs_set_stream(esp_cam_sensor_device_t *dev, int enable) {
-    esp_err_t ret = sc202cs_write(dev->sccb_handle, SC202CS_REG_SLEEP_MODE, enable ? 0x01 : 0x00);
-    dev->stream_status = enable;
-    ESP_LOGI(SC202CS_TAG, "Stream=%d", enable);
-    return ret;
-}
-
-// Fonctions de gestion des paramètres
-static esp_err_t sc202cs_set_para_value(esp_cam_sensor_device_t *dev, uint32_t id, const void *arg, size_t size) {
-    esp_err_t ret = ESP_OK;
-    uint32_t u32_val = *(uint32_t *)arg;
-    struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
-    
-    if (!cam_sc202cs) return ESP_ERR_INVALID_ARG;
-    
-    switch (id) {
-        case ESP_CAM_SENSOR_EXPOSURE_VAL: {
-            uint32_t max_exp = 1244;
-            if (u32_val > max_exp) u32_val = max_exp;
-            if (u32_val < 0xff) u32_val = 0xff;
-            
-            ESP_LOGD(SC202CS_TAG, "Set exposure: 0x%X (max=0x%X)", u32_val, max_exp);
-            
-            ret = sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_H, SC202CS_FETCH_EXP_H(u32_val));
-            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_M, SC202CS_FETCH_EXP_M(u32_val));
-            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_SHUTTER_TIME_L, SC202CS_FETCH_EXP_L(u32_val));
-            
-            if (ret == ESP_OK) {
-                cam_sc202cs->sc202cs_para.exposure_val = u32_val;
-            }
-            break;
-        }
-        
-        case ESP_CAM_SENSOR_GAIN: {
-            if (u32_val >= s_limited_abs_gain_index) {
-                u32_val = s_limited_abs_gain_index - 1;
-            }
-            
-            ESP_LOGD(SC202CS_TAG, "Set gain[%u]: abs_gain=%u, DFine=0x%02X, DCoarse=0x%02X, Analog=0x%02X",
-                     u32_val,
-                     sc202cs_abs_gain_val_map[u32_val],
-                     sc202cs_gain_map[u32_val].dgain_fine,
-                     sc202cs_gain_map[u32_val].dgain_coarse,
-                     sc202cs_gain_map[u32_val].analog_gain);
-            
-            ret = sc202cs_write(dev->sccb_handle, SC202CS_REG_DIG_FINE_GAIN, 
-                               sc202cs_gain_map[u32_val].dgain_fine);
-            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_DIG_COARSE_GAIN, 
-                                sc202cs_gain_map[u32_val].dgain_coarse);
-            ret |= sc202cs_write(dev->sccb_handle, SC202CS_REG_ANG_GAIN, 
-                                sc202cs_gain_map[u32_val].analog_gain);
-            
-            if (ret == ESP_OK) {
-                cam_sc202cs->sc202cs_para.gain_index = u32_val;
-            }
-            break;
-        }
-        
-        case ESP_CAM_SENSOR_VFLIP: {
-            int *value = (int *)arg;
-            ret = sc202cs_set_vflip(dev, *value);
-            break;
-        }
-        
-        case ESP_CAM_SENSOR_HMIRROR: {
-            int *value = (int *)arg;
-            ret = sc202cs_set_mirror(dev, *value);
-            break;
-        }
-        
-        default:
-            ESP_LOGE(SC202CS_TAG, "Paramètre non supporté: 0x%08X", id);
-            ret = ESP_ERR_INVALID_ARG;
-            break;
-    }
-    
-    return ret;
-}
-
-static esp_err_t sc202cs_set_format(esp_cam_sensor_device_t *dev, const void *format) {
-    const sc202cs_reginfo_t *reg_list = init_reglist_1280x720_30fps;
-    
-    ESP_LOGI(SC202CS_TAG, "Configuration: 1280x720 @ 30fps (RAW8 -> RGB565)");
-    
-    if (reg_list == NULL) {
-        ESP_LOGE(SC202CS_TAG, "Liste de registres invalide");
-        return ESP_FAIL;
-    }
-    
-    esp_err_t ret = sc202cs_write_array(dev->sccb_handle, (sc202cs_reginfo_t*)reg_list);
-    
-    if (ret != ESP_OK) {
-        ESP_LOGE(SC202CS_TAG, "Set format failed: %d", ret);
-        return ret;
-    }
-    
-    if (dev->priv) {
-        struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
-        cam_sc202cs->sc202cs_para.exposure_val = 0x300;  // ✅ EXPOSITION RÉDUITE par défaut
-        cam_sc202cs->sc202cs_para.gain_index = 0;
-        ESP_LOGI(SC202CS_TAG, "Paramètres par défaut: exp=0x%X, gain_idx=%u", 
-                 cam_sc202cs->sc202cs_para.exposure_val,
-                 cam_sc202cs->sc202cs_para.gain_index);
-    }
-    
-    ESP_LOGI(SC202CS_TAG, "✓ Format 1280x720 configuré avec succès");
-    return ESP_OK;
-}
-
-static esp_err_t sc202cs_priv_ioctl(esp_cam_sensor_device_t *dev, uint32_t cmd, void *arg) {
-    esp_err_t ret = ESP_OK;
-    
-    switch (cmd) {
-        case 0x04000004:
-            ret = sc202cs_set_stream(dev, *(int*)arg);
-            break;
-            
-        case ESP_CAM_SENSOR_VFLIP:
-            ret = sc202cs_set_vflip(dev, *(int*)arg);
-            ESP_LOGI(SC202CS_TAG, "VFlip: %d", *(int*)arg);
-            break;
-            
-        case ESP_CAM_SENSOR_HMIRROR:
-            ret = sc202cs_set_mirror(dev, *(int*)arg);
-            ESP_LOGI(SC202CS_TAG, "HMirror: %d", *(int*)arg);
-            break;
-            
-        case ESP_CAM_SENSOR_EXPOSURE_VAL:
-        case ESP_CAM_SENSOR_GAIN:
-            ret = sc202cs_set_para_value(dev, cmd, arg, sizeof(uint32_t));
-            break;
-            
-        default:
-            ESP_LOGD(SC202CS_TAG, "IOCTL non géré: 0x%08X", cmd);
-            ret = ESP_ERR_NOT_SUPPORTED;
-            break;
-    }
-    
-    return ret;
-}
-
-static esp_err_t sc202cs_delete(esp_cam_sensor_device_t *dev) {
-    if (dev) {
-        if (dev->priv) {
-            free(dev->priv);
-            dev->priv = NULL;
-        }
-        free(dev);
-    }
-    return ESP_OK;
-}
-
-static const esp_cam_sensor_ops_t sc202cs_ops = {
-    .set_format = (int (*)(esp_cam_sensor_device_t*, const void*))sc202cs_set_format,
-    .priv_ioctl = (int (*)(esp_cam_sensor_device_t*, uint32_t, void*))sc202cs_priv_ioctl,
-    .del = (int (*)(esp_cam_sensor_device_t*))sc202cs_delete,
-};
-
-esp_cam_sensor_device_t *sc202cs_detect(esp_cam_sensor_config_t *config) {
-    if (!config) return NULL;
-    
-    for (size_t i = 0; i < sizeof(sc202cs_abs_gain_val_map) / sizeof(sc202cs_abs_gain_val_map[0]); i++) {
-        if (sc202cs_abs_gain_val_map[i] > s_limited_abs_gain) {
-            s_limited_abs_gain_index = i - 1;
-            break;
-        }
-    }
-    
-    ESP_LOGI(SC202CS_TAG, "Gain limité à: %u (index: %u)", s_limited_abs_gain, s_limited_abs_gain_index);
-    
-    esp_cam_sensor_device_t *dev = (esp_cam_sensor_device_t*)calloc(1, sizeof(esp_cam_sensor_device_t));
-    if (!dev) {
-        ESP_LOGE(SC202CS_TAG, "Pas de mémoire pour le device");
-        return NULL;
-    }
-    
-    struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam*)calloc(1, sizeof(struct sc202cs_cam));
-    if (!cam_sc202cs) {
-        ESP_LOGE(SC202CS_TAG, "Pas de mémoire pour priv");
-        free(dev);
-        return NULL;
-    }
-    
-    dev->name = (char*)SC202CS_SENSOR_NAME;
-    dev->sccb_handle = config->sccb_handle;
-    dev->xclk_pin = config->xclk_pin;
-    dev->reset_pin = config->reset_pin;
-    dev->pwdn_pin = config->pwdn_pin;
-    dev->sensor_port = config->sensor_port;
-    dev->ops = &sc202cs_ops;
-    dev->priv = cam_sc202cs;
-    
-    if (sc202cs_get_sensor_id(dev, &dev->id) != ESP_OK) {
-        ESP_LOGE(SC202CS_TAG, "Échec lecture ID capteur");
-        free(cam_sc202cs);
-        free(dev);
-        return NULL;
-    }
-    
-    if (dev->id.pid != SC202CS_PID) {
-        ESP_LOGE(SC202CS_TAG, "PID incorrect: 0x%04x (attendu: 0x%04x)", dev->id.pid, SC202CS_PID);
-        free(cam_sc202cs);
-        free(dev);
-        return NULL;
-    }
-    
-    ESP_LOGI(SC202CS_TAG, "✓ SC202CS détecté");
-    ESP_LOGI(SC202CS_TAG, "  - PID: 0x%04X", dev->id.pid);
-    ESP_LOGI(SC202CS_TAG, "  - Niveaux de gain: %u (1.0x à %.1fx)", 
-             s_limited_abs_gain_index, 
-             sc202cs_abs_gain_val_map[s_limited_abs_gain_index - 1] / 1000.0f);
-    ESP_LOGI(SC202CS_TAG, "  - Exposition: 0x%03X à 0x%03X", 0xff, 0x4dc);
-    
-    return dev;
-}
+// Stub pour compatibilité mais inutilisé avec ESP-Video
+typedef struct {} sc202cs_para_t;
+struct sc202cs_cam { sc202cs_para_t sc202cs_para; };
 
 } // extern "C"
 
-#endif  // USE_ESP32_VARIANT_ESP32P4
-
 // ============================================================================
-// CODE TAB5 CAMERA
+// IMPLÉMENTATION TAB5 CAMERA AVEC ESP-VIDEO
 // ============================================================================
 
 namespace esphome {
@@ -660,11 +181,203 @@ namespace tab5_camera {
 
 static const char *const TAG = "tab5_camera";
 
-void Tab5Camera::setup() {
-  ESP_LOGI(TAG, "🎥 Initialisation Tab5 Camera");
+// Helpers I2C
+bool Tab5CameraV4L2::sc202cs_write_reg_(uint16_t reg, uint8_t value) {
+  uint8_t data[3] = {
+    (uint8_t)(reg >> 8),
+    (uint8_t)(reg & 0xFF),
+    value
+  };
+  return this->write(data, 3) == i2c::ERROR_OK;
+}
+
+uint8_t Tab5CameraV4L2::sc202cs_read_reg_(uint16_t reg, bool *success) {
+  uint8_t addr[2] = {(uint8_t)(reg >> 8), (uint8_t)(reg & 0xFF)};
+  uint8_t value = 0;
   
-#ifdef USE_ESP32_VARIANT_ESP32P4
-  if (this->reset_pin_ != nullptr) {
+  if (this->write(addr, 2) != i2c::ERROR_OK || 
+      this->read(&value, 1) != i2c::ERROR_OK) {
+    if (success) *success = false;
+    return 0;
+  }
+  
+  if (success) *success = true;
+  return value;
+}
+
+// Init capteur avec registres complets
+bool Tab5CameraV4L2::init_sensor_sc202cs_() {
+  ESP_LOGI(TAG, "Init SC202CS avec registres complets...");
+  
+  // Vérifier ID
+  bool ok;
+  uint8_t id_h = this->sc202cs_read_reg_(SC202CS_REG_SENSOR_ID_H, &ok);
+  if (!ok) return false;
+  uint8_t id_l = this->sc202cs_read_reg_(SC202CS_REG_SENSOR_ID_L, &ok);
+  if (!ok) return false;
+  
+  uint16_t pid = (id_h << 8) | id_l;
+  ESP_LOGI(TAG, "  Chip ID: 0x%04X", pid);
+  
+  if (pid != SC202CS_PID) {
+    ESP_LOGE(TAG, "ID invalide! (attendu 0x%04X)", SC202CS_PID);
+    return false;
+  }
+  
+  // Écrire tous les registres
+  ESP_LOGI(TAG, "Écriture des registres 720p@30fps...");
+  for (size_t i = 0; init_reglist_1280x720_30fps[i].reg != SC202CS_REG_END; i++) {
+    uint16_t reg = init_reglist_1280x720_30fps[i].reg;
+    uint8_t val = init_reglist_1280x720_30fps[i].val;
+    
+    if (reg == SC202CS_REG_DELAY) {
+      delay(val);
+    } else {
+      if (!this->sc202cs_write_reg_(reg, val)) {
+        ESP_LOGE(TAG, "Échec reg 0x%04X", reg);
+        return false;
+      }
+    }
+  }
+  
+  ESP_LOGI(TAG, "✓ SC202CS configuré (RAW8 1280x720@30fps)");
+  return true;
+}
+
+// Configurer gain/exposition
+bool Tab5CameraV4L2::configure_sensor_params_() {
+  ESP_LOGI(TAG, "Configuration paramètres capteur...");
+  
+  // Flip/Mirror
+  if (this->flip_mirror_) {
+    this->sc202cs_write_reg_(0x3221, 0x60);  // flip+mirror bits
+    ESP_LOGI(TAG, "  ✓ Flip/Mirror activé");
+  }
+  
+  // Gain
+  if (!this->auto_gain_ && this->manual_gain_ > 0) {
+    uint32_t gain_idx = this->manual_gain_;
+    if (gain_idx > 191) gain_idx = 191;
+    
+    this->sc202cs_write_reg_(SC202CS_REG_DIG_FINE_GAIN, 
+                            sc202cs_gain_map[gain_idx].dgain_fine);
+    this->sc202cs_write_reg_(SC202CS_REG_DIG_COARSE_GAIN, 
+                            sc202cs_gain_map[gain_idx].dgain_coarse);
+    this->sc202cs_write_reg_(SC202CS_REG_ANG_GAIN, 
+                            sc202cs_gain_map[gain_idx].analog_gain);
+    
+    ESP_LOGI(TAG, "  ✓ Gain manuel[%u]: %.1fx", 
+             gain_idx, sc202cs_abs_gain_val_map[gain_idx]/1000.0f);
+  }
+  
+  // Exposition
+  if (!this->auto_exposure_ && this->manual_exposure_ > 0) {
+    uint32_t exp = this->manual_exposure_;
+    if (exp > 0x4DC) exp = 0x4DC;
+    if (exp < 0xFF) exp = 0xFF;
+    
+    this->sc202cs_write_reg_(SC202CS_REG_SHUTTER_TIME_H, SC202CS_FETCH_EXP_H(exp));
+    this->sc202cs_write_reg_(SC202CS_REG_SHUTTER_TIME_M, SC202CS_FETCH_EXP_M(exp));
+    this->sc202cs_write_reg_(SC202CS_REG_SHUTTER_TIME_L, SC202CS_FETCH_EXP_L(exp));
+    
+    ESP_LOGI(TAG, "  ✓ Exposition manuelle: 0x%03X", exp);
+  }
+  
+  return true;
+}
+
+// Init ESP-Video
+bool Tab5CameraV4L2::init_esp_video_() {
+  ESP_LOGI(TAG, "Init ESP-Video...");
+  
+  esp_video_init_sccb_config_t sccb_cfg = {};
+  sccb_cfg.init_sccb = false;  // On gère l'I2C via ESPHome
+  
+  esp_video_init_csi_config_t csi_cfg = {};
+  csi_cfg.sccb_config = sccb_cfg;
+  csi_cfg.reset_pin = GPIO_NUM_NC;
+  csi_cfg.pwdn_pin = GPIO_NUM_NC;
+  
+  esp_err_t ret = esp_video_init(ESP_VIDEO_DEVICE_MIPI_CSI, &csi_cfg);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "esp_video_init failed: %s", esp_err_to_name(ret));
+    return false;
+  }
+  
+  ESP_LOGI(TAG, "✓ ESP-Video OK");
+  return true;
+}
+
+// Config format V4L2
+bool Tab5CameraV4L2::configure_format_v4l2_() {
+  struct v4l2_format fmt = {};
+  fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  fmt.fmt.pix.width = 1280;
+  fmt.fmt.pix.height = 720;
+  fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB565;
+  fmt.fmt.pix.field = V4L2_FIELD_NONE;
+  
+  if (ioctl(this->video_fd_, VIDIOC_S_FMT, &fmt) < 0) {
+    ESP_LOGE(TAG, "VIDIOC_S_FMT failed: %d", errno);
+    return false;
+  }
+  
+  this->frame_buffer_size_ = fmt.fmt.pix.sizeimage;
+  ESP_LOGI(TAG, "✓ Format: 1280x720 RGB565 (%u bytes)", this->frame_buffer_size_);
+  return true;
+}
+
+// Setup buffers V4L2
+bool Tab5CameraV4L2::setup_buffers_v4l2_() {
+  struct v4l2_requestbuffers req = {};
+  req.count = 3;
+  req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  req.memory = V4L2_MEMORY_MMAP;
+  
+  if (ioctl(this->video_fd_, VIDIOC_REQBUFS, &req) < 0) {
+    ESP_LOGE(TAG, "VIDIOC_REQBUFS failed");
+    return false;
+  }
+  
+  this->buffer_count_ = req.count;
+  this->v4l2_buffers_ = (struct v4l2_buffer*)calloc(req.count, sizeof(struct v4l2_buffer));
+  this->buffer_mappings_ = (BufferMapping*)calloc(req.count, sizeof(BufferMapping));
+  
+  for (uint32_t i = 0; i < req.count; i++) {
+    struct v4l2_buffer buf = {};
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buf.memory = V4L2_MEMORY_MMAP;
+    buf.index = i;
+    
+    if (ioctl(this->video_fd_, VIDIOC_QUERYBUF, &buf) < 0) return false;
+    
+    void *start = mmap(NULL, buf.length, PROT_READ | PROT_WRITE,
+                       MAP_SHARED, this->video_fd_, buf.m.offset);
+    if (start == MAP_FAILED) return false;
+    
+    this->buffer_mappings_[i].start = start;
+    this->buffer_mappings_[i].length = buf.length;
+    
+    if (ioctl(this->video_fd_, VIDIOC_QBUF, &buf) < 0) return false;
+    this->v4l2_buffers_[i] = buf;
+  }
+  
+  ESP_LOGI(TAG, "✓ %u buffers V4L2 mappés", req.count);
+  return true;
+}
+
+// Start sensor
+bool Tab5CameraV4L2::start_sensor_streaming_() {
+  return this->sc202cs_write_reg_(SC202CS_REG_SLEEP_MODE, 0x01);  // Exit standby
+}
+
+// SETUP PRINCIPAL
+void Tab5CameraV4L2::setup() {
+  ESP_LOGI(TAG, "═══════════════════════════════════════════════════");
+  ESP_LOGI(TAG, "🎥 Tab5 Camera + ESP-Video + SC202CS complet");
+  ESP_LOGI(TAG, "═══════════════════════════════════════════════════");
+  
+  if (this->reset_pin_) {
     this->reset_pin_->setup();
     this->reset_pin_->digital_write(false);
     delay(10);
@@ -672,587 +385,136 @@ void Tab5Camera::setup() {
     delay(20);
   }
   
-  if (this->pwdn_pin_ != nullptr) {
-    this->pwdn_pin_->setup();
-    this->pwdn_pin_->digital_write(false);
-  }
+  delay(50);
   
-  if (!this->init_sensor_()) {
-    ESP_LOGE(TAG, "❌ Échec init capteur");
+  // 1. Init SC202CS avec TOUS les registres
+  if (!this->init_sensor_sc202cs_()) {
+    ESP_LOGE(TAG, "❌ Échec init SC202CS");
     this->mark_failed();
     return;
   }
   
-  if (!this->init_ldo_()) {
-    ESP_LOGE(TAG, "❌ Échec init LDO");
+  // 2. Configurer gain/exposition
+  if (!this->configure_sensor_params_()) {
+    ESP_LOGW(TAG, "⚠ Paramètres partiels");
+  }
+  
+  // 3. Init ESP-Video
+  if (!this->init_esp_video_()) {
+    ESP_LOGE(TAG, "❌ Échec ESP-Video");
     this->mark_failed();
     return;
   }
   
-  if (!this->init_csi_()) {
-    ESP_LOGE(TAG, "❌ Échec init CSI");
+  // 4. Ouvrir /dev/video0
+  this->video_fd_ = open("/dev/video0", O_RDWR | O_NONBLOCK);
+  if (this->video_fd_ < 0) {
+    ESP_LOGE(TAG, "❌ Cannot open /dev/video0");
     this->mark_failed();
     return;
   }
   
-  if (!this->init_isp_()) {
-    ESP_LOGE(TAG, "❌ Échec init ISP");
+  // 5. Config format
+  if (!this->configure_format_v4l2_()) {
+    ESP_LOGE(TAG, "❌ Format failed");
     this->mark_failed();
     return;
   }
   
-  if (!this->allocate_buffer_()) {
-    ESP_LOGE(TAG, "❌ Échec allocation buffer");
+  // 6. Setup buffers
+  if (!this->setup_buffers_v4l2_()) {
+    ESP_LOGE(TAG, "❌ Buffers failed");
     this->mark_failed();
     return;
+  }
+  
+  // 7. Start sensor
+  if (!this->start_sensor_streaming_()) {
+    ESP_LOGW(TAG, "⚠ Sensor start failed");
   }
   
   this->initialized_ = true;
+  
+  ESP_LOGI(TAG, "═══════════════════════════════════════════════════");
   ESP_LOGI(TAG, "✅ Caméra prête");
-  
-#else
-  ESP_LOGE(TAG, "❌ ESP32-P4 requis");
-  this->mark_failed();
-#endif
+  ESP_LOGI(TAG, "   Pipeline: SC202CS→CSI→ESP-Video→ISP→RGB565→V4L2");
+  ESP_LOGI(TAG, "   Device: /dev/video0 (fd=%d)", this->video_fd_);
+  ESP_LOGI(TAG, "═══════════════════════════════════════════════════");
 }
 
-#ifdef USE_ESP32_VARIANT_ESP32P4
-
-bool Tab5Camera::init_sensor_() {
-  ESP_LOGI(TAG, "Init capteur SC202CS (1280x720)");
+bool Tab5CameraV4L2::start_streaming() {
+  if (!this->initialized_ || this->streaming_) return this->streaming_;
   
-  sccb_i2c_config_t sccb_config = {};
-  sccb_config.device_address = this->sensor_address_;
-  sccb_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-  sccb_config.scl_speed_hz = 400000;
-  sccb_config.addr_bits_width = 16;
-  sccb_config.val_bits_width = 8;
-  
-  esp_sccb_io_handle_t sccb_handle;
-  esp_err_t ret = sccb_new_i2c_io_esphome(this, &sccb_config, &sccb_handle);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "SCCB init failed: %d", ret);
-    return false;
-  }
-  
-  ESP_LOGI(TAG, "✓ SCCB initialisé");
-  
-  esp_cam_sensor_config_t sensor_config = {};
-  sensor_config.sccb_handle = sccb_handle;
-  sensor_config.reset_pin = -1;
-  sensor_config.pwdn_pin = -1;
-  sensor_config.xclk_pin = (int8_t)this->external_clock_pin_;
-  sensor_config.xclk_freq_hz = this->external_clock_frequency_;
-  sensor_config.sensor_port = ESP_CAM_SENSOR_MIPI_CSI;
-  
-  this->sensor_device_ = sc202cs_detect(&sensor_config);
-  
-  if (this->sensor_device_ == nullptr) {
-    ESP_LOGE(TAG, "SC202CS detection failed");
-    return false;
-  }
-  
-  if (sc202cs_set_format(this->sensor_device_, NULL) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set format");
-    free(this->sensor_device_);
-    this->sensor_device_ = nullptr;
-    return false;
-  }
-  
-  if (this->flip_mirror_) {
-    int enable_flip = 1;
-    int enable_mirror = 1;
-    
-    esp_err_t ret_flip = esp_cam_sensor_ioctl(this->sensor_device_, 0x04000010, &enable_flip);
-    esp_err_t ret_mirror = esp_cam_sensor_ioctl(this->sensor_device_, 0x04000011, &enable_mirror);
-    
-    if (ret_flip == ESP_OK && ret_mirror == ESP_OK) {
-      ESP_LOGI(TAG, "✓ Flip/Mirror activé");
-    } else {
-      ESP_LOGW(TAG, "⚠ Flip/Mirror partiellement activé (flip=%d, mirror=%d)", ret_flip, ret_mirror);
-    }
-  }
-  
-  ESP_LOGI(TAG, "✓ SC202CS détecté (PID: 0x%04X)", this->sensor_device_->id.pid);
-  return true;
-}
-
-bool Tab5Camera::init_ldo_() {
-  ESP_LOGI(TAG, "Init LDO MIPI");
-  
-  esp_ldo_channel_config_t ldo_config = {
-    .chan_id = 3,
-    .voltage_mv = 2500,
-  };
-  
-  esp_err_t ret = esp_ldo_acquire_channel(&ldo_config, &this->ldo_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "LDO failed: %d", ret);
-    return false;
-  }
-  
-  ESP_LOGI(TAG, "✓ LDO OK (2.5V)");
-  return true;
-}
-
-bool Tab5Camera::init_csi_() {
-  ESP_LOGI(TAG, "Init MIPI-CSI pour 1280x720");
-  
-  esp_cam_ctlr_csi_config_t csi_config = {};
-  csi_config.ctlr_id = 0;
-  csi_config.clk_src = MIPI_CSI_PHY_CLK_SRC_DEFAULT;
-  csi_config.h_res = 1280;
-  csi_config.v_res = 720;
-  csi_config.lane_bit_rate_mbps = 576;
-  csi_config.input_data_color_type = CAM_CTLR_COLOR_RAW8;
-  csi_config.output_data_color_type = CAM_CTLR_COLOR_RGB565;
-  csi_config.data_lane_num = 1;
-  csi_config.byte_swap_en = false;
-  csi_config.queue_items = 3;  // ✅ CORRECTION CRITIQUE: 3 au lieu de 1 !
-  
-  esp_err_t ret = esp_cam_new_csi_ctlr(&csi_config, &this->csi_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "CSI failed: %d", ret);
-    return false;
-  }
-  
-  esp_cam_ctlr_evt_cbs_t callbacks = {
-    .on_get_new_trans = Tab5Camera::on_csi_new_frame_,
-    .on_trans_finished = Tab5Camera::on_csi_frame_done_,
-  };
-  
-  ret = esp_cam_ctlr_register_event_callbacks(this->csi_handle_, &callbacks, this);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Callbacks failed: %d", ret);
-    return false;
-  }
-  
-  ret = esp_cam_ctlr_enable(this->csi_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Enable CSI failed: %d", ret);
-    return false;
-  }
-  
-  ESP_LOGI(TAG, "✅ CSI configuré (queue_items=3 pour 30 FPS)");
-  return true;
-}
-
-bool Tab5Camera::init_isp_() {
-  ESP_LOGI(TAG, "Init ISP pour 1280x720");
-  
-  esp_isp_processor_cfg_t isp_config = {};
-  isp_config.clk_src = ISP_CLK_SRC_DEFAULT;
-  isp_config.input_data_source = ISP_INPUT_DATA_SOURCE_CSI;
-  isp_config.input_data_color_type = ISP_COLOR_RAW8;
-  isp_config.output_data_color_type = ISP_COLOR_RGB565;
-  isp_config.h_res = 1280;
-  isp_config.v_res = 720;
-  isp_config.has_line_start_packet = false;
-  isp_config.has_line_end_packet = false;
-  isp_config.clk_hz = 120000000;
-  isp_config.bayer_order = (color_raw_element_order_t)0;  // RGGB pour SC202CS
-  
-  esp_err_t ret = esp_isp_new_processor(&isp_config, &this->isp_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Échec création ISP: 0x%x", ret);
-    return false;
-  }
-  
-  ret = esp_isp_enable(this->isp_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Échec activation ISP: 0x%x", ret);
-    esp_isp_del_processor(this->isp_handle_);
-    this->isp_handle_ = nullptr;
-    return false;
-  }
-  
-  ESP_LOGI(TAG, "✓ ISP initialisé pour 1280x720 (120 MHz, RGGB)");
-  
-  this->configure_isp_color_correction_();
-  
-  return true;
-}
-
-void Tab5Camera::configure_isp_color_correction_() {
-  ESP_LOGI(TAG, "Configuration corrections couleur");
-  
-#ifdef CONFIG_ISP_COLOR_ENABLED
-  esp_isp_color_config_t color_config = {};
-  color_config.color_contrast = {145, 145, 145};
-  color_config.color_saturation = {135, 135, 135};
-  color_config.color_hue = 0;
-  color_config.color_brightness = 60;
-  
-  esp_err_t ret = esp_isp_color_configure(this->isp_handle_, &color_config);
-  if (ret == ESP_OK) {
-    ESP_LOGI(TAG, "✓ Corrections couleur configurées");
-  } else {
-    ESP_LOGW(TAG, "Échec configuration couleur: %s", esp_err_to_name(ret));
-  }
-#endif
-
-  if (this->sensor_device_) {
-    int awb_value = 1;
-    esp_err_t ret = esp_cam_sensor_ioctl(this->sensor_device_, 0x03010001, &awb_value);
-    if (ret == ESP_OK) {
-      ESP_LOGI(TAG, "✓ AWB activé");
-    } else {
-      ESP_LOGW(TAG, "AWB non supporté (erreur: 0x%x)", ret);
-    }
-  }
-}
-
-bool Tab5Camera::allocate_buffer_() {
-  // Calculer la taille du buffer (1280x720 RGB565 = 2 bytes par pixel)
-  this->frame_buffer_size_ = 1280 * 720 * 2;
-  
-  // Arrondir à un multiple de 64 pour l'alignement SDIO
-  size_t aligned_size = (this->frame_buffer_size_ + 63) & ~63;
-  
-  ESP_LOGI(TAG, "Allocation buffers: %u bytes (aligné: %u)", 
-           this->frame_buffer_size_, aligned_size);
-  
-  // Allouer le premier buffer avec alignement strict
-  this->frame_buffers_[0] = (uint8_t*)heap_caps_aligned_alloc(
-    64, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA
-  );
-  
-  if (!this->frame_buffers_[0]) {
-    ESP_LOGE(TAG, "❌ Échec allocation buffer 0");
-    return false;
-  }
-  
-  // Initialiser à zéro pour éviter les données corrompues
-  memset(this->frame_buffers_[0], 0, aligned_size);
-  
-  // Allouer le second buffer
-  this->frame_buffers_[1] = (uint8_t*)heap_caps_aligned_alloc(
-    64, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA
-  );
-  
-  if (!this->frame_buffers_[1]) {
-    ESP_LOGE(TAG, "❌ Échec allocation buffer 1");
-    heap_caps_free(this->frame_buffers_[0]);
-    this->frame_buffers_[0] = nullptr;
-    return false;
-  }
-  
-  // Initialiser à zéro
-  memset(this->frame_buffers_[1], 0, aligned_size);
-  
-  // Mettre à jour la taille avec la taille alignée
-  this->frame_buffer_size_ = aligned_size;
-  
-  // Définir le buffer actuel
-  this->current_frame_buffer_ = this->frame_buffers_[0];
-  
-  ESP_LOGI(TAG, "✓ Buffers alloués:");
-  ESP_LOGI(TAG, "  - Buffer 0: %p", this->frame_buffers_[0]);
-  ESP_LOGI(TAG, "  - Buffer 1: %p", this->frame_buffers_[1]);
-  ESP_LOGI(TAG, "  - Taille: 2x%u bytes (aligné 64)", aligned_size);
-  
-  return true;
-}
-
-bool IRAM_ATTR Tab5Camera::on_csi_new_frame_(
-  esp_cam_ctlr_handle_t handle,
-  esp_cam_ctlr_trans_t *trans,
-  void *user_data
-) {
-  Tab5Camera *cam = (Tab5Camera*)user_data;
-  
-  if (!cam || !trans) {
-    return false;
-  }
-  
-  // Vérifier que le buffer est valide
-  uint8_t current_buf = cam->buffer_index_;
-  if (current_buf >= 2 || cam->frame_buffers_[current_buf] == nullptr) {
-    return false;
-  }
-  
-  trans->buffer = cam->frame_buffers_[current_buf];
-  trans->buflen = cam->frame_buffer_size_;
-  
-  return false;
-}
-
-bool IRAM_ATTR Tab5Camera::on_csi_frame_done_(
-  esp_cam_ctlr_handle_t handle,
-  esp_cam_ctlr_trans_t *trans,
-  void *user_data
-) {
-  Tab5Camera *cam = (Tab5Camera*)user_data;
-  
-  if (!cam || !trans) {
-    return false;
-  }
-  
-  // Vérifier que la frame est valide et complète
-  if (trans->received_size > 0 && 
-      trans->received_size <= cam->frame_buffer_size_) {
-    
-    // Marquer la frame comme prête
-    cam->frame_ready_ = true;
-    cam->frames_available_++;  // ✅ AJOUT: Incrémenter compteur atomique
-    
-    // Passer au buffer suivant (double buffering)
-    cam->buffer_index_ = (cam->buffer_index_ + 1) % 2;
-  }
-  
-  return false;
-}
-
-CameraResolutionInfo Tab5Camera::get_resolution_info_() const {
-  return {1280, 720};
-}
-
-bool Tab5Camera::apply_sensor_params_() {
-  if (!this->sensor_device_) {
-    return false;
-  }
-  
-  bool success = true;
-  
-  if (!this->auto_gain_ && this->manual_gain_index_ > 0) {
-    ESP_LOGI(TAG, "Application du gain manuel: index %u", this->manual_gain_index_);
-    if (!this->set_gain(this->manual_gain_index_)) {
-      ESP_LOGW(TAG, "Échec application gain manuel");
-      success = false;
-    }
-  } else {
-    ESP_LOGI(TAG, "Gain automatique activé");
-  }
-  
-  if (!this->auto_exposure_ && this->manual_exposure_val_ > 0) {
-    ESP_LOGI(TAG, "Application de l'exposition manuelle: 0x%03X", this->manual_exposure_val_);
-    if (!this->set_exposure(this->manual_exposure_val_)) {
-      ESP_LOGW(TAG, "Échec application exposition manuelle");
-      success = false;
-    }
-  } else {
-    ESP_LOGI(TAG, "Exposition automatique activée");
-  }
-  
-  return success;
-}
-
-bool Tab5Camera::set_gain(uint32_t gain_index) {
-  if (!this->sensor_device_ || !this->initialized_) {
-    ESP_LOGW(TAG, "Capteur non initialisé");
-    return false;
-  }
-  
-  if (gain_index > 191) {
-    ESP_LOGW(TAG, "Gain index %u hors limites, limité à 191", gain_index);
-    gain_index = 191;
-  }
-  
-  esp_err_t ret = esp_cam_sensor_ioctl(
-    this->sensor_device_, 
-    0x04020002,
-    &gain_index
-  );
-  
-  if (ret == ESP_OK) {
-    this->current_gain_index_ = gain_index;
-    ESP_LOGD(TAG, "Gain réglé à l'index %u", gain_index);
-    return true;
-  } else {
-    ESP_LOGE(TAG, "Échec réglage gain: 0x%x", ret);
-    return false;
-  }
-}
-
-bool Tab5Camera::set_exposure(uint32_t exposure_val) {
-  if (!this->sensor_device_ || !this->initialized_) {
-    ESP_LOGW(TAG, "Capteur non initialisé");
-    return false;
-  }
-  
-  if (exposure_val < 0xFF) {
-    ESP_LOGW(TAG, "Exposition %u trop faible, limitée à 0xFF", exposure_val);
-    exposure_val = 0xFF;
-  }
-  if (exposure_val > 0x4DC) {
-    ESP_LOGW(TAG, "Exposition %u trop élevée, limitée à 0x4DC", exposure_val);
-    exposure_val = 0x4DC;
-  }
-  
-  esp_err_t ret = esp_cam_sensor_ioctl(
-    this->sensor_device_, 
-    0x04020001,
-    &exposure_val
-  );
-  
-  if (ret == ESP_OK) {
-    this->current_exposure_val_ = exposure_val;
-    ESP_LOGD(TAG, "Exposition réglée à 0x%03X (%u lines)", exposure_val, exposure_val);
-    return true;
-  } else {
-    ESP_LOGE(TAG, "Échec réglage exposition: 0x%x", ret);
-    return false;
-  }
-}
-
-bool Tab5Camera::start_streaming() {
-  if (!this->initialized_) {
-    ESP_LOGE(TAG, "Caméra non initialisée");
-    return false;
-  }
-  
-  if (this->streaming_) {
-    ESP_LOGW(TAG, "Déjà en streaming");
-    return true;
-  }
-  
-  ESP_LOGI(TAG, "Démarrage streaming...");
-  
-  // Réinitialiser les états
-  this->frame_ready_ = false;
-  this->buffer_index_ = 0;
-  this->frames_available_ = 0;  // ✅ AJOUT
-  this->total_frames_captured_ = 0;  // ✅ AJOUT
-  this->last_fps_report_time_ = millis();  // ✅ AJOUT
-  
-  // Démarrer le capteur SC202CS
-  if (this->sensor_device_) {
-    int enable = 1;
-    esp_err_t ret = esp_cam_sensor_ioctl(
-      this->sensor_device_, 
-      0x04000004,  // ESP_CAM_SENSOR_IOC_S_STREAM
-      &enable
-    );
-    
-    if (ret != ESP_OK) {
-      ESP_LOGE(TAG, "❌ Échec démarrage capteur: 0x%x", ret);
-      return false;
-    }
-    
-    ESP_LOGI(TAG, "✓ Capteur démarré");
-    
-    // Délai pour stabilisation du capteur
-    delay(150);
-    
-    // Appliquer les paramètres de gain et exposition
-    this->apply_sensor_params_();
-  }
-  
-  // Démarrer le contrôleur CSI
-  esp_err_t ret = esp_cam_ctlr_start(this->csi_handle_);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "❌ Échec démarrage CSI: 0x%x", ret);
-    
-    // Arrêter le capteur en cas d'échec
-    if (this->sensor_device_) {
-      int enable = 0;
-      esp_cam_sensor_ioctl(this->sensor_device_, 0x04000004, &enable);
-    }
-    
+  enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  if (ioctl(this->video_fd_, VIDIOC_STREAMON, &type) < 0) {
+    ESP_LOGE(TAG, "VIDIOC_STREAMON failed");
     return false;
   }
   
   this->streaming_ = true;
+  this->total_frames_captured_ = 0;
+  this->last_fps_report_time_ = millis();
   
-  ESP_LOGI(TAG, "✅ Streaming actif (1280x720 @ 30fps)");
+  ESP_LOGI(TAG, "✅ Streaming @ 30 FPS");
   return true;
 }
 
-bool Tab5Camera::stop_streaming() {
-  if (!this->streaming_) {
-    return true;
-  }
+bool Tab5CameraV4L2::stop_streaming() {
+  if (!this->streaming_) return true;
   
-  esp_cam_ctlr_stop(this->csi_handle_);
-  
-  if (this->sensor_device_) {
-    int enable = 0;
-    esp_cam_sensor_ioctl(this->sensor_device_, 0x04000004, &enable);
-  }
-  
+  enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  ioctl(this->video_fd_, VIDIOC_STREAMOFF, &type);
   this->streaming_ = false;
-  ESP_LOGI(TAG, "⏹ Streaming arrêté");
+  
   return true;
 }
 
-bool Tab5Camera::capture_frame() {
-  if (!this->streaming_) {
+bool Tab5CameraV4L2::capture_frame() {
+  if (!this->streaming_) return false;
+  
+  struct v4l2_buffer buf = {};
+  buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  buf.memory = V4L2_MEMORY_MMAP;
+  
+  if (ioctl(this->video_fd_, VIDIOC_DQBUF, &buf) < 0) {
+    if (errno == EAGAIN) return false;
     return false;
   }
   
-  // ✅ MODIFICATION: Vérifier le compteur atomique
-  if (this->frames_available_ == 0) {
+  if (!(buf.flags & V4L2_BUF_FLAG_DONE) || buf.index >= this->buffer_count_) {
+    ioctl(this->video_fd_, VIDIOC_QBUF, &buf);
     return false;
   }
   
-  this->frames_available_--;  // ✅ Décrémenter
-  this->frame_ready_ = false;
+  this->current_frame_buffer_ = (uint8_t*)this->buffer_mappings_[buf.index].start;
+  ioctl(this->video_fd_, VIDIOC_QBUF, &buf);
   
-  // Utiliser le buffer qui vient d'être complété
-  uint8_t last_complete_buffer = (this->buffer_index_ + 1) % 2;
-  
-  // Vérifier que le buffer est valide
-  if (this->frame_buffers_[last_complete_buffer] != nullptr) {
-    this->current_frame_buffer_ = this->frame_buffers_[last_complete_buffer];
-    
-    // ✅ AJOUT: Statistiques FPS
-    this->total_frames_captured_++;
-    uint32_t now = millis();
-    if (now - this->last_fps_report_time_ >= 5000) {  // Toutes les 5s
-      float fps = (float)this->total_frames_captured_ / 
-                  ((now - this->last_fps_report_time_) / 1000.0f);
-      ESP_LOGI(TAG, "📊 FPS réel: %.2f (%u frames en %u ms)", 
-               fps, this->total_frames_captured_, 
-               now - this->last_fps_report_time_);
-      this->total_frames_captured_ = 0;
-      this->last_fps_report_time_ = now;
-    }
-    
-    return true;
+  this->total_frames_captured_++;
+  uint32_t now = millis();
+  if (now - this->last_fps_report_time_ >= 5000) {
+    float fps = (float)this->total_frames_captured_ / 
+                ((now - this->last_fps_report_time_) / 1000.0f);
+    ESP_LOGI(TAG, "📊 FPS: %.2f (%u frames)", fps, this->total_frames_captured_);
+    this->total_frames_captured_ = 0;
+    this->last_fps_report_time_ = now;
   }
   
-  ESP_LOGW(TAG, "Buffer invalide détecté");
-  return false;
+  return true;
 }
 
-uint16_t Tab5Camera::get_image_width() const {
-  return 1280;
-}
+void Tab5CameraV4L2::loop() {}
 
-uint16_t Tab5Camera::get_image_height() const {
-  return 720;
-}
-
-#endif  // USE_ESP32_VARIANT_ESP32P4
-
-void Tab5Camera::loop() {
-  // Tout est géré par les callbacks ISR
-}
-
-void Tab5Camera::dump_config() {
-  ESP_LOGCONFIG(TAG, "Tab5 Camera:");
-  ESP_LOGCONFIG(TAG, "  Capteur: SC202CS @ 0x%02X", this->sensor_address_);
-  ESP_LOGCONFIG(TAG, "  Résolution: %ux%u", 
-                this->get_image_width(), this->get_image_height());
+void Tab5CameraV4L2::dump_config() {
+  ESP_LOGCONFIG(TAG, "Tab5 Camera (ESP-Video):");
+  ESP_LOGCONFIG(TAG, "  Résolution: 1280x720");
   ESP_LOGCONFIG(TAG, "  Format: RGB565");
-  ESP_LOGCONFIG(TAG, "  Flip/Mirror: %s", this->flip_mirror_ ? "OUI" : "NON");
-  
-  ESP_LOGCONFIG(TAG, "  Gain: %s", this->auto_gain_ ? "AUTO" : "MANUEL");
-  if (!this->auto_gain_) {
-    ESP_LOGCONFIG(TAG, "    Gain manuel: index %u", this->manual_gain_index_);
-  }
-  
-  ESP_LOGCONFIG(TAG, "  Exposition: %s", this->auto_exposure_ ? "AUTO" : "MANUELLE");
-  if (!this->auto_exposure_) {
-    ESP_LOGCONFIG(TAG, "    Exposition manuelle: 0x%03X (%u lines)", 
-                  this->manual_exposure_val_, this->manual_exposure_val_);
-  }
-  
+  ESP_LOGCONFIG(TAG, "  Device: /dev/video0");
   ESP_LOGCONFIG(TAG, "  Streaming: %s", this->streaming_ ? "OUI" : "NON");
-  ESP_LOGCONFIG(TAG, "  Initialisé: %s", this->initialized_ ? "OUI" : "NON");
 }
 
 }  // namespace tab5_camera
 }  // namespace esphome
+
+#endif  // USE_ESP32_VARIANT_ESP32P4
 
 
