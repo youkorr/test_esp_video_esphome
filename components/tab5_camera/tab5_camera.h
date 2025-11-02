@@ -13,9 +13,7 @@ extern "C" {
   #include "esp_cam_ctlr_csi.h"
   #include "driver/isp.h"
   #include "esp_ldo_regulator.h"
-  #include "videodev2.h"
-  #include "v4l2-controls.h"
-  #include "v4l2-common.h"
+
   
 }
 #endif
