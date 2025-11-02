@@ -850,7 +850,7 @@ bool Tab5Camera::init_isp_() {
   isp_config.has_line_start_packet = false;
   isp_config.has_line_end_packet = false;
   isp_config.clk_hz = 120000000;
-  isp_config.bayer_order = (color_raw_element_order_t)3;
+  isp_config.bayer_order = (color_raw_element_order_t)0;  // RGGB pour SC202CS
   
   esp_err_t ret = esp_isp_new_processor(&isp_config, &this->isp_handle_);
   if (ret != ESP_OK) {
@@ -866,7 +866,7 @@ bool Tab5Camera::init_isp_() {
     return false;
   }
   
-  ESP_LOGI(TAG, "✓ ISP initialisé pour 1280x720 (120 MHz, BGGR)");
+  ESP_LOGI(TAG, "✓ ISP initialisé pour 1280x720 (120 MHz, RGGB)");
   
   this->configure_isp_color_correction_();
   
