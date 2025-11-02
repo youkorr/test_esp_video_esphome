@@ -46,6 +46,8 @@ required_stubs = [
     "esp_cam_sensor.h",
     "esp_cam_sensor_xclk.h", 
     "esp_sccb_i2c.h"
+    "esp_cam_motor_types.h"
+    "esp_cam_sensor_types.h"
 ]
 
 all_present = True
@@ -76,6 +78,8 @@ def add_include(path):
 add_include(os.path.join(component_dir, "include"))
 add_include(os.path.join(component_dir, "include", "linux"))
 add_include(os.path.join(component_dir, "include", "sys"))
+add_include(os.path.join(component_dir, "src"))
+add_include(os.path.join(component_dir, "src", "device"))
 add_include(os.path.join(component_dir, "private_include"))
 
 # ===============================================================
