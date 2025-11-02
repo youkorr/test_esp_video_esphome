@@ -1,10 +1,8 @@
 """
 esp_video_build.py
----------------------------------------------
-Build script universel ESP-Video
-Compatible ESPHome / PlatformIO
-Détection automatique : esp_video/include OU deps/include
-y compris dans /data/external_components/...
+--------------------------------------------------
+Build script universel pour ESP-Video + dépendances caméra (esp_cam).
+Compatible ESPHome / PlatformIO / GitHub.
 """
 
 import os
@@ -25,11 +23,11 @@ if "espidf" not in framework:
     sys.exit(1)
 
 # ===============================================================
-# 2️⃣ Détection avancée du dossier racine du composant
+# 2️⃣ Détection automatique du dossier racine du composant
 # ===============================================================
 
 def find_component_root():
-    """Trouve automatiquement esp_video/include ou deps/include, même dans external_components."""
+    """Trouve automatiquement le dossier racine du composant esp_video."""
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
     except NameError:
@@ -40,21 +38,20 @@ def find_component_root():
         os.path.dirname(current_dir),
         os.path.dirname(os.path.dirname(current_dir)),
         "/data/external_components",
-        "/config/esphome",
         "/data/build",
+        "/config/esphome",
     ]
 
     for root in search_roots:
         if not os.path.exists(root):
             continue
-
         for dirpath, dirnames, _ in os.walk(root):
-            for d in dirnames:
-                if d.lower() in ("esp_video", "deps"):
-                    include_path = os.path.join(dirpath, d, "include")
-                    if os.path.exists(include_path):
-                        print(f"[ESP-Video] 📍 Include trouvé dans {include_path}")
-                        return os.path.join(dirpath, d)
+            if "esp_video" in dirnames:
+                path = os.path.join(dirpath, "esp_video")
+                if os.path.exists(os.path.join(path, "include")):
+                    print(f"[ESP-Video] 📍 Include trouvé dans {path}/include")
+                    return path
+    print("[ESP-Video] ⚠️ Aucun include détecté automatiquement, utilisation du dossier courant.")
     return current_dir
 
 
@@ -70,14 +67,37 @@ def add_include_if_exists(path):
         env.Append(CPPPATH=[path])
         print(f"[ESP-Video] ➕ Include ajouté : {path}")
 
-# Inclure tous les répertoires pertinents
+# ESP-Video includes
 add_include_if_exists(os.path.join(component_dir, "include"))
 add_include_if_exists(os.path.join(component_dir, "include", "linux"))
 add_include_if_exists(os.path.join(component_dir, "include", "sys"))
 add_include_if_exists(os.path.join(component_dir, "private_include"))
 
 # ===============================================================
-# 4️⃣ Flags de compilation
+# 4️⃣ Détection et ajout des dossiers deps/
+# ===============================================================
+
+deps_dir = os.path.join(component_dir, "deps")
+if os.path.exists(deps_dir):
+    print(f"[ESP-Video] 📦 Dossier deps détecté : {deps_dir}")
+    # Inclure deps/include
+    add_include_if_exists(os.path.join(deps_dir, "include"))
+    add_include_if_exists(os.path.join(deps_dir, "private_include"))
+
+    # Recherche spécifique pour deps/esp_cam
+    esp_cam_dir = os.path.join(deps_dir, "esp_cam")
+    if os.path.exists(esp_cam_dir):
+        print(f"[ESP-Video] 🎥 Dépendance caméra détectée : {esp_cam_dir}")
+        add_include_if_exists(os.path.join(esp_cam_dir, "include"))
+        add_include_if_exists(os.path.join(esp_cam_dir, "include", "driver"))
+        add_include_if_exists(os.path.join(esp_cam_dir, "private_include"))
+    else:
+        print("[ESP-Video] 🔍 Aucune dépendance caméra (esp_cam) trouvée dans deps/")
+else:
+    print("[ESP-Video] ⚠️ Aucun dossier deps/ détecté à côté de esp_video/")
+
+# ===============================================================
+# 5️⃣ Flags de compilation
 # ===============================================================
 
 flags = [
@@ -93,7 +113,7 @@ for flag in flags:
     print(f"[ESP-Video] ✅ Flag ajouté : {flag}")
 
 # ===============================================================
-# 5️⃣ Informations environnementales
+# 6️⃣ Informations environnementales
 # ===============================================================
 
 idf_path = env.get("IDF_PATH", "")
@@ -109,7 +129,7 @@ if project_dir and os.path.exists(project_dir):
         print(f"[ESP-Video] (Info) Chemin absolu utilisé: {component_dir}")
 
 # ===============================================================
-# 6️⃣ Fin
+# 7️⃣ Fin
 # ===============================================================
 
 print("[ESP-Video] ✅ Configuration du build terminée avec succès.")
