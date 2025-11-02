@@ -34,11 +34,12 @@ async def to_code(config):
         component_dir / "private_include",            # Headers privés
     ]
     
-    # Vérifier les stubs critiques
+    # Vérifier les stubs critiques (4 fichiers maintenant)
     critical_stubs = [
         component_dir / "deps" / "include" / "esp_cam_sensor.h",
         component_dir / "deps" / "include" / "esp_cam_sensor_xclk.h",
-        component_dir / "deps" / "include" / "esp_sccb_i2c.h"
+        component_dir / "deps" / "include" / "esp_sccb_i2c.h",
+        component_dir / "deps" / "include" / "esp_cam_sensor_types.h",  # NOUVEAU
     ]
     
     for stub in critical_stubs:
