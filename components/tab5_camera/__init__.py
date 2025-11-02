@@ -26,6 +26,12 @@ CONF_RESET_PIN = "reset_pin"
 CONF_ADDRESS_SENSOR_SC202CS = "address_sensor_sc202cs"
 CONF_FLIP_MIRROR = "flip_mirror"
 
+# 🟢 NOUVEAUX PARAMÈTRES pour le contrôle du gain et de l'exposition
+CONF_AUTO_GAIN = "auto_gain"
+CONF_MANUAL_GAIN = "manual_gain"
+CONF_AUTO_EXPOSURE = "auto_exposure"
+CONF_MANUAL_EXPOSURE = "manual_exposure"
+
 # Déclarer les enums C++
 CameraResolution = tab5_camera_ns.enum("CameraResolution")
 RESOLUTION_VGA = CameraResolution.RESOLUTION_VGA
@@ -64,16 +70,42 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_FREQUENCY, default=24000000): cv.int_range(min=6000000, max=40000000),
             cv.Optional(CONF_RESET_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_ADDRESS_SENSOR_SC202CS, default=0x36): cv.i2c_address,
-            cv.Optional(CONF_RESOLUTION, default="VGA"): cv.enum(CAMERA_RESOLUTIONS, upper=True),
+            cv.Optional(CONF_RESOLUTION, default="720P"): cv.enum(CAMERA_RESOLUTIONS, upper=True),
             cv.Optional(CONF_PIXEL_FORMAT, default="RGB565"): cv.enum(PIXEL_FORMATS, upper=True),
             cv.Optional(CONF_JPEG_QUALITY, default=10): cv.int_range(min=1, max=63),
             cv.Optional(CONF_FRAMERATE, default=30): cv.int_range(min=1, max=60),
             cv.Optional(CONF_FLIP_MIRROR, default=False): cv.boolean,
+            
+            # 🟢 NOUVEAUX PARAMÈTRES pour le contrôle du gain
+            cv.Optional(CONF_AUTO_GAIN, default=True): cv.boolean,
+            cv.Optional(CONF_MANUAL_GAIN): cv.int_range(min=0, max=191),  # 0-191 pour 192 niveaux
+            
+            # 🟢 NOUVEAUX PARAMÈTRES pour le contrôle de l'exposition
+            cv.Optional(CONF_AUTO_EXPOSURE, default=True): cv.boolean,
+            cv.Optional(CONF_MANUAL_EXPOSURE): cv.int_range(min=0x00FF, max=0x04DC),  # 255 à 1244
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
     .extend(i2c.i2c_device_schema(0x36))
 )
+
+
+def validate_manual_params(config):
+    """Valider que si auto_gain/auto_exposure est désactivé, les valeurs manuelles sont fournies"""
+    if not config.get(CONF_AUTO_GAIN, True) and CONF_MANUAL_GAIN not in config:
+        raise cv.Invalid(
+            f"Vous devez spécifier '{CONF_MANUAL_GAIN}' quand '{CONF_AUTO_GAIN}' est False"
+        )
+    
+    if not config.get(CONF_AUTO_EXPOSURE, True) and CONF_MANUAL_EXPOSURE not in config:
+        raise cv.Invalid(
+            f"Vous devez spécifier '{CONF_MANUAL_EXPOSURE}' quand '{CONF_AUTO_EXPOSURE}' est False"
+        )
+    
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_manual_params)
 
 
 async def to_code(config):
@@ -102,6 +134,15 @@ async def to_code(config):
     
     # Flip/Mirror
     cg.add(var.set_flip_mirror(config[CONF_FLIP_MIRROR]))
+    
+    # 🟢 NOUVEAUX PARAMÈTRES: Gain et Exposition
+    cg.add(var.set_auto_gain(config[CONF_AUTO_GAIN]))
+    if CONF_MANUAL_GAIN in config:
+        cg.add(var.set_manual_gain(config[CONF_MANUAL_GAIN]))
+    
+    cg.add(var.set_auto_exposure(config[CONF_AUTO_EXPOSURE]))
+    if CONF_MANUAL_EXPOSURE in config:
+        cg.add(var.set_manual_exposure(config[CONF_MANUAL_EXPOSURE]))
     
     if CONF_RESET_PIN in config:
         reset_pin = await cg.gpio_pin_expression(config[CONF_RESET_PIN])
