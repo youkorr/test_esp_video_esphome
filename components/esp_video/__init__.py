@@ -1,12 +1,10 @@
-"""ESP-Video component for ESPHome with dependency stubs."""
+"""ESP-Video component for ESPHome with all includes."""
 
 import logging
-import os
 from pathlib import Path
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,38 +22,57 @@ async def to_code(config):
     
     # Trouver le dossier du composant
     component_dir = Path(__file__).parent
-    deps_include = component_dir / "deps" / "include"
     
-    # Vérifier que les stubs existent
-    required_stubs = [
-        "esp_cam_sensor.h",
-        "esp_cam_sensor_xclk.h",
-        "esp_sccb_i2c.h"
+    _LOGGER.info("[ESP-Video] Configuration des includes...")
+    
+    # Liste de tous les dossiers à inclure
+    include_dirs = [
+        component_dir / "deps" / "include",           # Stubs (PRIORITÉ 1)
+        component_dir / "include",                    # Headers publics ESP-Video
+        component_dir / "include" / "linux",          # Headers Linux (V4L2)
+        component_dir / "include" / "sys",            # Headers sys
+        component_dir / "private_include",            # Headers privés
     ]
     
-    _LOGGER.info("[ESP-Video] Vérification des stubs headers...")
+    # Vérifier les stubs critiques
+    critical_stubs = [
+        component_dir / "deps" / "include" / "esp_cam_sensor.h",
+        component_dir / "deps" / "include" / "esp_cam_sensor_xclk.h",
+        component_dir / "deps" / "include" / "esp_sccb_i2c.h"
+    ]
     
-    all_present = True
-    for stub in required_stubs:
-        stub_path = deps_include / stub
-        if stub_path.exists():
-            _LOGGER.info(f"[ESP-Video]   ✓ {stub}")
-        else:
-            _LOGGER.error(f"[ESP-Video]   ❌ {stub} MANQUANT!")
-            all_present = False
+    for stub in critical_stubs:
+        if not stub.exists():
+            raise cv.Invalid(
+                f"ESP-Video stub manquant: {stub.name}. "
+                f"Vérifiez que deps/include/ contient tous les stubs requis."
+            )
+        _LOGGER.info(f"[ESP-Video]   ✓ {stub.name}")
     
-    if not all_present:
-        raise cv.Invalid(
-            f"ESP-Video stubs manquants dans {deps_include}. "
-            "Vérifiez que deps/include/ contient les 3 fichiers requis."
-        )
+    # Vérifier les headers ESP-Video critiques
+    critical_headers = [
+        component_dir / "include" / "esp_video_init.h",
+        component_dir / "include" / "esp_video_device.h",
+    ]
     
-    # Ajouter les includes AVANT la compilation
-    _LOGGER.info(f"[ESP-Video] Ajout de deps/include au build: {deps_include}")
+    for header in critical_headers:
+        if not header.exists():
+            raise cv.Invalid(
+                f"ESP-Video header manquant: {header.name}. "
+                f"Vérifiez l'intégrité du composant ESP-Video."
+            )
+        _LOGGER.info(f"[ESP-Video]   ✓ {header.name}")
     
-    # Ajouter au CPPPATH via platformio_options
-    cg.add_platformio_option("build_flags", [
-        f"-I{deps_include}",
+    # Construire les flags d'include
+    build_flags = []
+    
+    for inc_dir in include_dirs:
+        if inc_dir.exists():
+            build_flags.append(f"-I{inc_dir}")
+            _LOGGER.info(f"[ESP-Video]   ➕ {inc_dir.relative_to(component_dir)}")
+    
+    # Ajouter les flags de configuration
+    build_flags.extend([
         "-DCONFIG_ESP_VIDEO_ENABLE_MIPI_CSI_VIDEO_DEVICE=1",
         "-DCONFIG_ESP_VIDEO_ENABLE_ISP=1",
         "-DCONFIG_ESP_VIDEO_ENABLE_ISP_VIDEO_DEVICE=1",
@@ -63,6 +80,10 @@ async def to_code(config):
         "-DCONFIG_ESP_VIDEO_USE_HEAP_ALLOCATOR=1",
     ])
     
+    # Ajouter tous les flags au build
+    cg.add_platformio_option("build_flags", build_flags)
+    
+    _LOGGER.info(f"[ESP-Video] ✅ {len(build_flags)} flags ajoutés au build")
     _LOGGER.info("[ESP-Video] Configuration terminée")
 
 
