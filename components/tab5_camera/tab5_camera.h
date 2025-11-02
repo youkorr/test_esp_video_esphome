@@ -11,7 +11,7 @@ extern "C" {
   #include "esp_video_init.h"
   #include "esp_video_device.h"
   #include "linux/videodev2.h"
-  #include "esp_cam_sensor.h"
+  //#include "esp_cam_sensor.h"
   #include "driver/i2c_master.h"
 }
 
