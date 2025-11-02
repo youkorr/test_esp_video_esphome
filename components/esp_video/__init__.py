@@ -64,9 +64,16 @@ async def to_code(config):
     build_script = os.path.join(component_dir, "esp_video_build.py")
     
     if os.path.exists(build_script):
-        # Utiliser le chemin ABSOLU pour éviter les erreurs /data/data/...
         cg.add_platformio_option("extra_scripts", [f"post:{build_script}"])
         print(f"✓ Added build script: {build_script}")
     else:
         raise cv.Invalid(f"Build script not found: {build_script}")
+    
+    # ========================================================================
+    # LOG RUNTIME (VISIBLE DANS ESPHOME LOGS)
+    # ========================================================================
+    
+    # Ce message apparaîtra au démarrage du firmware (pas seulement à la compilation)
+    cg.add_global(cg.RawExpression('ESP_LOGI("esp_video", "🎬 ESP-Video component loaded successfully");'))
+
 
