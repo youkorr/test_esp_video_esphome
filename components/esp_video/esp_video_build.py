@@ -5,17 +5,31 @@ import os
 import sys
 
 # ============================================================================
-# TROUVER LE RÉPERTOIRE ESP-VIDEO AUTOMATIQUEMENT
+# TROUVER LE RÉPERTOIRE ESP-VIDEO ORIGINAL (même depuis le dossier de build)
 # ============================================================================
 
-# Essayer d'obtenir le chemin du script via __file__, sinon fallback sur PROJECT_DIR
 try:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 except NameError:
-    # __file__ n'est pas défini dans certains contextes ESPHome
     SCRIPT_DIR = os.path.join(env.get("PROJECT_DIR", ""), "components", "esp_video")
 
-ESP_VIDEO_DIR = SCRIPT_DIR
+# Si le script est exécuté depuis un répertoire de build (copie temporaire),
+# on tente de retrouver le vrai dossier source dans /data/external_components/
+if "build" in SCRIPT_DIR and "components/esp_video" in SCRIPT_DIR:
+    external_root = "/data/external_components"
+    found_dir = None
+    for root, dirs, files in os.walk(external_root):
+        if os.path.basename(root) == "esp_video" and os.path.exists(os.path.join(root, "src")):
+            found_dir = root
+            break
+    if found_dir:
+        ESP_VIDEO_DIR = found_dir
+        print(f"🔍 Found real source dir: {ESP_VIDEO_DIR}")
+    else:
+        ESP_VIDEO_DIR = SCRIPT_DIR
+        print("⚠️ Could not locate real esp_video source; using build dir")
+else:
+    ESP_VIDEO_DIR = SCRIPT_DIR
 
 print("=" * 80)
 print("🎬 ESP-Video Build Script")
@@ -23,11 +37,14 @@ print(f"   Script location: {SCRIPT_DIR}")
 print(f"   ESP-Video dir: {ESP_VIDEO_DIR}")
 print("=" * 80)
 
-# Vérifier que le répertoire src/ existe
+# ============================================================================
+# VÉRIFIER LA PRÉSENCE DES SOURCES
+# ============================================================================
+
 src_dir = os.path.join(ESP_VIDEO_DIR, "src")
 if not os.path.exists(src_dir):
     print(f"❌ ERROR: src/ not found in {ESP_VIDEO_DIR}")
-    print("   This script must be in the esp_video/ directory")
+    print("   This script must be in or point to the esp_video/ directory containing src/")
     sys.exit(1)
 
 # ============================================================================
@@ -121,4 +138,5 @@ print(f"✓ Added {len(build_flags)} build flags")
 print("=" * 80)
 print("✅ ESP-Video build configuration complete")
 print("=" * 80)
+
 
