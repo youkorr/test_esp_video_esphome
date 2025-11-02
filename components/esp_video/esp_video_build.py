@@ -2,14 +2,34 @@
 
 Import("env")
 import os
+import sys
 
-ESP_VIDEO_DIR = os.path.join(env.subst("$PROJECT_DIR"), "external_components", "esp_video")
+# ============================================================================
+# TROUVER LE RÉPERTOIRE ESP-VIDEO AUTOMATIQUEMENT
+# ============================================================================
 
-print("=" * 60)
+# Le script est dans esp_video/esp_video_build.py
+# Donc ESP_VIDEO_DIR est le répertoire parent de ce script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ESP_VIDEO_DIR = SCRIPT_DIR  # Le script EST dans le dossier esp_video
+
+print("=" * 80)
 print("🎬 ESP-Video Build Script")
-print(f"   Directory: {ESP_VIDEO_DIR}")
+print(f"   Script location: {SCRIPT_DIR}")
+print(f"   ESP-Video dir: {ESP_VIDEO_DIR}")
+print("=" * 80)
 
-# Includes
+# Vérifier que le répertoire src/ existe
+src_dir = os.path.join(ESP_VIDEO_DIR, "src")
+if not os.path.exists(src_dir):
+    print(f"❌ ERROR: src/ not found in {ESP_VIDEO_DIR}")
+    print("   This script must be in the esp_video/ directory")
+    sys.exit(1)
+
+# ============================================================================
+# INCLUDES
+# ============================================================================
+
 include_paths = [
     os.path.join(ESP_VIDEO_DIR, "include"),
     os.path.join(ESP_VIDEO_DIR, "include", "linux"),
@@ -21,8 +41,13 @@ for path in include_paths:
     if os.path.exists(path):
         env.Append(CPPPATH=[path])
         print(f"✓ Include: {os.path.basename(path)}")
+    else:
+        print(f"⚠ Missing: {path}")
 
-# Sources
+# ============================================================================
+# SOURCES
+# ============================================================================
+
 base_sources = [
     "esp_video.c",
     "esp_video_buffer.c",
@@ -40,34 +65,59 @@ device_sources = [
 ]
 
 all_sources = []
-src_dir = os.path.join(ESP_VIDEO_DIR, "src")
 
-for src in base_sources + device_sources:
+for src in base_sources:
     src_path = os.path.join(src_dir, src)
     if os.path.exists(src_path):
         all_sources.append(src_path)
+        print(f"✓ Source: {src}")
+    else:
+        print(f"⚠ Missing: {src}")
+
+for src in device_sources:
+    src_path = os.path.join(src_dir, src)
+    if os.path.exists(src_path):
+        all_sources.append(src_path)
+        print(f"✓ Device: {src}")
+    else:
+        print(f"⚠ Missing: {src}")
+
+# ============================================================================
+# COMPILER
+# ============================================================================
 
 if all_sources:
+    # Créer une library statique
     esp_video_lib = env.Library(
-        target=os.path.join("$BUILD_DIR", "esp_video"),
+        target=os.path.join("$BUILD_DIR", "libesp_video"),
         source=all_sources
     )
+    
+    # Ajouter au link
     env.Append(LIBS=[esp_video_lib])
-    print(f"✓ Compiled {len(all_sources)} sources")
+    
+    print(f"✅ Compiled {len(all_sources)} sources into libesp_video.a")
 else:
     print("❌ No sources found!")
+    sys.exit(1)
 
-# Build flags
-flags = [
-    "-DCONFIG_ESP_VIDEO_ENABLE_MIPI_CSI_VIDEO_DEVICE=1",
-    "-DCONFIG_ESP_VIDEO_ENABLE_ISP=1",
-    "-DCONFIG_ESP_VIDEO_ENABLE_ISP_VIDEO_DEVICE=1",
-    "-DCONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER=1",
-    "-DCONFIG_ESP_VIDEO_USE_HEAP_ALLOCATOR=1",
+# ============================================================================
+# BUILD FLAGS
+# ============================================================================
+
+build_flags = [
+    ("CONFIG_ESP_VIDEO_ENABLE_MIPI_CSI_VIDEO_DEVICE", "1"),
+    ("CONFIG_ESP_VIDEO_ENABLE_ISP", "1"),
+    ("CONFIG_ESP_VIDEO_ENABLE_ISP_VIDEO_DEVICE", "1"),
+    ("CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER", "1"),
+    ("CONFIG_ESP_VIDEO_USE_HEAP_ALLOCATOR", "1"),
+    ("CONFIG_IDF_TARGET_ESP32P4", "1"),
 ]
 
-for flag in flags:
-    env.Append(CPPDEFINES=[flag.replace("-D", "").split("=")[0] + "=" + flag.split("=")[1]])
+for flag_name, flag_value in build_flags:
+    env.Append(CPPDEFINES=[(flag_name, flag_value)])
 
-print(f"✓ Added {len(flags)} flags")
-print("=" * 60)
+print(f"✓ Added {len(build_flags)} build flags")
+print("=" * 80)
+print("✅ ESP-Video build configuration complete")
+print("=" * 80)
