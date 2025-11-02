@@ -529,7 +529,7 @@ static esp_err_t sc202cs_set_format(esp_cam_sensor_device_t *dev, const void *fo
     
     if (dev->priv) {
         struct sc202cs_cam *cam_sc202cs = (struct sc202cs_cam *)dev->priv;
-        cam_sc202cs->sc202cs_para.exposure_val = 0x4dc;
+        cam_sc202cs->sc202cs_para.exposure_val = 0x300;  // ✅ EXPOSITION RÉDUITE par défaut
         cam_sc202cs->sc202cs_para.gain_index = 0;
         ESP_LOGI(SC202CS_TAG, "Paramètres par défaut: exp=0x%X, gain_idx=%u", 
                  cam_sc202cs->sc202cs_para.exposure_val,
@@ -808,7 +808,7 @@ bool Tab5Camera::init_csi_() {
   csi_config.output_data_color_type = CAM_CTLR_COLOR_RGB565;
   csi_config.data_lane_num = 1;
   csi_config.byte_swap_en = false;
-  csi_config.queue_items = 1;  // Réduit à 1 pour éviter crash SDIO
+  csi_config.queue_items = 3;  // ✅ CORRECTION CRITIQUE: 3 au lieu de 1 !
   
   esp_err_t ret = esp_cam_new_csi_ctlr(&csi_config, &this->csi_handle_);
   if (ret != ESP_OK) {
@@ -833,7 +833,7 @@ bool Tab5Camera::init_csi_() {
     return false;
   }
   
-  ESP_LOGI(TAG, "✓ CSI configuré (queue_items=1 pour stabilité)");
+  ESP_LOGI(TAG, "✅ CSI configuré (queue_items=3 pour 30 FPS)");
   return true;
 }
 
@@ -994,6 +994,7 @@ bool IRAM_ATTR Tab5Camera::on_csi_frame_done_(
     
     // Marquer la frame comme prête
     cam->frame_ready_ = true;
+    cam->frames_available_++;  // ✅ AJOUT: Incrémenter compteur atomique
     
     // Passer au buffer suivant (double buffering)
     cam->buffer_index_ = (cam->buffer_index_ + 1) % 2;
@@ -1110,6 +1111,9 @@ bool Tab5Camera::start_streaming() {
   // Réinitialiser les états
   this->frame_ready_ = false;
   this->buffer_index_ = 0;
+  this->frames_available_ = 0;  // ✅ AJOUT
+  this->total_frames_captured_ = 0;  // ✅ AJOUT
+  this->last_fps_report_time_ = millis();  // ✅ AJOUT
   
   // Démarrer le capteur SC202CS
   if (this->sensor_device_) {
@@ -1176,23 +1180,34 @@ bool Tab5Camera::capture_frame() {
     return false;
   }
   
-  // Vérification atomique du flag
-  bool was_ready = this->frame_ready_;
-  if (!was_ready) {
+  // ✅ MODIFICATION: Vérifier le compteur atomique
+  if (this->frames_available_ == 0) {
     return false;
   }
   
-  // Réinitialiser le flag AVANT de copier le buffer
+  this->frames_available_--;  // ✅ Décrémenter
   this->frame_ready_ = false;
   
   // Utiliser le buffer qui vient d'être complété
-  // buffer_index_ pointe sur le buffer EN COURS de remplissage
-  // Donc le buffer complété est l'autre
   uint8_t last_complete_buffer = (this->buffer_index_ + 1) % 2;
   
   // Vérifier que le buffer est valide
   if (this->frame_buffers_[last_complete_buffer] != nullptr) {
     this->current_frame_buffer_ = this->frame_buffers_[last_complete_buffer];
+    
+    // ✅ AJOUT: Statistiques FPS
+    this->total_frames_captured_++;
+    uint32_t now = millis();
+    if (now - this->last_fps_report_time_ >= 5000) {  // Toutes les 5s
+      float fps = (float)this->total_frames_captured_ / 
+                  ((now - this->last_fps_report_time_) / 1000.0f);
+      ESP_LOGI(TAG, "📊 FPS réel: %.2f (%u frames en %u ms)", 
+               fps, this->total_frames_captured_, 
+               now - this->last_fps_report_time_);
+      this->total_frames_captured_ = 0;
+      this->last_fps_report_time_ = now;
+    }
+    
     return true;
   }
   
