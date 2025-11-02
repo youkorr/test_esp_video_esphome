@@ -9,7 +9,8 @@ from esphome.const import (
 from esphome import pins
 
 CODEOWNERS = ["@youkorr"]
-DEPENDENCIES = ["i2c", "esp32"]
+
+DEPENDENCIES = ["i2c", "esp32", "esp_video_wrapper"] 
 
 MULTI_CONF = True
 
